@@ -1,0 +1,102 @@
+# CMake 构建目录
+build/
+Build/
+cmake-build-*/
+
+# CMake 生成的文件
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+CTestTestfile.cmake
+_deps
+
+# Ninja 构建文件
+.ninja_deps
+.ninja_log
+build.ninja
+
+# 编译输出文件
+*.elf
+*.bin
+*.hex
+*.map
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dll
+*.exe
+
+# 调试文件
+*.log
+*.dmp
+*.ilk
+*.pdb
+
+# IDE 相关文件
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.swp
+*.swo
+*~
+.DS_Store
+
+# STM32CubeIDE / Eclipse
+.metadata/
+.settings/
+Debug/
+Release/
+.project
+.cproject
+
+# Keil MDK
+*.uvguix.*
+*.uvoptx
+*.bak
+*.dep
+*.uvproj
+*.uvprojx
+
+# IAR EWARM
+*.eww
+*.ewt
+*.dep
+*.ewd
+settings/
+Debug/Exe
+Debug/List
+Debug/Obj
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+
+# 临时文件
+*.tmp
+*.temp
+*.cache
+
+# 用户特定文件
+*.user
+*.suo
+
+# 生成的文档
+html/
+latex/
+
+# 包管理
+node_modules/
+package-lock.json
+
+# 其他
+*.stackdump
