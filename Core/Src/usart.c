@@ -190,7 +190,7 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
 /* USER CODE BEGIN 1 */
 
 /**
- * @brief  串口1发送格式化字符串（类似printf）
+ * @brief  串口2发送格式化字符串（类似printf）
  * @param  format: 格式化字符串
  * @param  ...: 可变参数
  * @retval None
@@ -218,8 +218,8 @@ void send_message(const char *format, ...)
     
     // 确保不超过缓冲区大小
     if (len > 0 && len < UART_TX_BUFFER_SIZE) {
-        // 通过串口1发送数据
-        HAL_UART_Transmit(&huart1, (uint8_t*)buffer, len, HAL_MAX_DELAY);
+        // 通过串口2发送数据
+        HAL_UART_Transmit(&huart2, (uint8_t*)buffer, len, HAL_MAX_DELAY);
     }
 }
 

@@ -246,7 +246,7 @@ void StartSensorTask(void const * argument)
     WF5803F_GetData(&temperature, &pressure);
     
     // 通过串口1发送数据
-    send_message("Temp: %.2f C, Press: %.2f kPa\n", temperature, pressure);
+    send_message("WF5803-Temp: %.2f C, Press: %.2f kPa\n", temperature, pressure);
     
     // 延时1秒
     osDelay(1000);
@@ -282,7 +282,7 @@ void StartNTCTask(void const * argument)
     Temp_NTC = compute_ntc_temperature(adcValue);
     
     // 通过串口1发送结果
-    send_message("NTC - ADC: %lu, Temp: %.2f°C\n", adcValue, Temp_NTC);
+    send_message("NTC-Temp: %.2fC\n", Temp_NTC);
     
     // 延时1秒
     osDelay(1000);

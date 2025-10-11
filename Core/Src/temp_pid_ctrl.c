@@ -321,9 +321,9 @@ void TempCtrl_Init(void)
            g_pid.Kp, g_pid.Ki, g_pid.Kd);
     
     // 打印温度区间信息
-    #if (TARGET_TEMPERATURE < 50.0f)
+    #if (TARGET_TEMP_INT < 50)
     send_message("[TEMP_CTRL] Temperature Range: LOW (30-50°C)\n");
-    #elif (TARGET_TEMPERATURE < 70.0f)
+    #elif (TARGET_TEMP_INT < 70)
     send_message("[TEMP_CTRL] Temperature Range: MID (50-70°C)\n");
     #else
     send_message("[TEMP_CTRL] Temperature Range: HIGH (70-100°C)\n");

@@ -71,15 +71,15 @@ void Send_VoltageWarning(float voltage, const char* message)
     if (strcmp(message, "OK") == 0) {
         // 电压正常
         snprintf(uartMsg, sizeof(uartMsg), 
-                 "电压正常，电压为%.2fV.\r\n", voltage);
+                 "Power OK,voltage: %.2fV.\r\n", voltage);
     } else {
         // 电压不足
         snprintf(uartMsg, sizeof(uartMsg), 
-                 "电压不足，��%.2fV，请充电。\r\n", voltage);
+                 "Power Low,voltage: %.2fV,please charge.\r\n", voltage);
     }
-    
-    // 通过 UART1 发送给上位机
-    HAL_UART_Transmit(&huart1, (uint8_t*)uartMsg, strlen(uartMsg), 1000);
+
+    // 通过 UART2 发送给上位机
+    HAL_UART_Transmit(&huart2, (uint8_t*)uartMsg, strlen(uartMsg), 1000);
 }
 
 /**

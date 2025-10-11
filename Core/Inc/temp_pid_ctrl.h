@@ -50,6 +50,7 @@ typedef struct {
 
 /* 目标温度配置 - 可通过此宏修改控制温度 */
 #define TARGET_TEMPERATURE      50.0f   // 目标温度 (°C)
+#define TARGET_TEMP_INT         50      // 目标温度整数值 (用于条件编译)
 
 /* PID参数配置 - 根据不同目标温度可能需要调整 */
 /* 低温区域 (30-50°C) 推荐参数 */
@@ -68,11 +69,11 @@ typedef struct {
 #define PID_KD_HIGH             1.0f    // 微分增益
 
 /* 根据目标温度自动选择PID参数 */
-#if (TARGET_TEMPERATURE < 50.0f)
+#if (TARGET_TEMP_INT < 50)
     #define PID_KP              PID_KP_LOW
     #define PID_KI              PID_KI_LOW
     #define PID_KD              PID_KD_LOW
-#elif (TARGET_TEMPERATURE < 70.0f)
+#elif (TARGET_TEMP_INT < 70)
     #define PID_KP              PID_KP_MID
     #define PID_KI              PID_KI_MID
     #define PID_KD              PID_KD_MID
