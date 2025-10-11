@@ -23,7 +23,8 @@
 #include "i2c.h"
 #include "usart.h"
 #include "gpio.h"
-
+#define NMOS1_ON()              HAL_GPIO_WritePin(NMOS1_G_GPIO_Port, NMOS1_G_Pin, GPIO_PIN_RESET)
+#define NMOS1_OFF()             HAL_GPIO_WritePin(NMOS1_G_GPIO_Port, NMOS1_G_Pin, GPIO_PIN_SET)
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -104,7 +105,7 @@ int main(void)
   MX_FREERTOS_Init();
 
   /* Start scheduler */
-  osKernelStart();
+  // osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
 
@@ -113,7 +114,15 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-
+    for(volatile int i=0;i<1000000;i++);
+    for(volatile int i=0;i<1000000;i++);
+    for(volatile int i=0;i<1000000;i++);
+    NMOS1_ON();
+    //这里添加一个手写的延时
+    for(volatile int i=0;i<1000000;i++);
+    for(volatile int i=0;i<1000000;i++);
+    for(volatile int i=0;i<1000000;i++);
+    //NMOS1_OFF();
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */

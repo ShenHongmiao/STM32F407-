@@ -37,6 +37,11 @@
 static PID_Controller_t g_pid;           // 全局PID控制器
 static volatile float g_current_duty = 0.0f;  // 当前占空比
 static volatile uint8_t g_heating_enabled = 1;  // 加热使能标志
+static volatile uint32_t g_init_timestamp = 0;  // 初始化时间戳
+static volatile uint8_t g_safety_delay_active = 1;  // 安全延迟标志
+
+/* Private define for safety delay */
+#define SAFETY_DELAY_MS    5000  // 上电后5秒安全延迟
 
 /* Private function prototypes -----------------------------------------------*/
 static void PWM_SetDuty(float duty);
@@ -234,6 +239,31 @@ void TempCtrl_SetDuty(float duty)
 void TempCtrl_Task(float current_temp)
 {
     static uint32_t pwm_counter = 0;
+    static uint8_t safety_msg_sent = 0;  // 安全延迟消息标志
+    
+    // ========== 安全延迟检查 (上电后5秒) ==========
+    if (g_safety_delay_active) {
+        uint32_t elapsed = HAL_GetTick() - g_init_timestamp;
+        
+        if (elapsed < SAFETY_DELAY_MS) {
+            // 安全延迟期间，强制关闭加热
+            NMOS1_OFF();
+            NMOS2_OFF();
+            g_current_duty = 0.0f;
+            
+            // 只发送一次安全延迟消息
+            if (!safety_msg_sent) {
+                send_message("[TEMP_CTRL] Safety delay active: heating disabled for %d seconds\n", 
+                           SAFETY_DELAY_MS / 1000);
+                safety_msg_sent = 1;
+            }
+            return;
+        } else {
+            // 安全延迟结束
+            g_safety_delay_active = 0;
+            send_message("[TEMP_CTRL] Safety delay ended, PID control starting...\n");
+        }
+    }
     
     // 检查是否使能加热
     if (!g_heating_enabled) {
@@ -311,6 +341,10 @@ void TempCtrl_Init(void)
     NMOS1_OFF();
     NMOS2_OFF();
     
+    // 记录初始化时间戳（用于安全延迟）
+    g_init_timestamp = HAL_GetTick();
+    g_safety_delay_active = 1;
+    
     // 使能加热
     g_heating_enabled = 1;
     g_current_duty = 0.0f;
@@ -319,6 +353,8 @@ void TempCtrl_Init(void)
     send_message("[TEMP_CTRL] Target Temperature: %.2f°C\n", TARGET_TEMPERATURE);
     send_message("[TEMP_CTRL] PID Parameters: Kp=%.2f, Ki=%.2f, Kd=%.2f\n", 
            g_pid.Kp, g_pid.Ki, g_pid.Kd);
+    send_message("[TEMP_CTRL] Safety delay: %d seconds before heating starts\n", 
+           SAFETY_DELAY_MS / 1000);
     
     // 打印温度区间信息
     #if (TARGET_TEMP_INT < 50)

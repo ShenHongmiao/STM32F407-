@@ -98,8 +98,11 @@ typedef struct {
 
 /* 温度控制配置 */
 #define TEMP_DEADBAND           0.5f    // 温度死区 (°C)，在目标温度±死区内不调整
-#define TEMP_EMERGENCY_MAX      80.0f  // 紧急最高温度限制 (°C)
-#define TEMP_SAFE_SHUTDOWN      75.0f  // 安全关机温度 (°C)
+#define TEMP_EMERGENCY_MAX      80.0f   // 紧急最高温度限制 (°C)
+#define TEMP_SAFE_SHUTDOWN      75.0f   // 安全关机温度 (°C)
+
+/* 安全保护配置 */
+#define SAFETY_DELAY_SECONDS    5       // 上电后安全延迟时间 (秒)，此期间加热关闭
 
 /* NMOS控制引脚配置 */
 #define NMOS1_ON()              HAL_GPIO_WritePin(NMOS1_G_GPIO_Port, NMOS1_G_Pin, GPIO_PIN_RESET)
@@ -162,6 +165,7 @@ void TempCtrl_SetDuty(float duty);
  * @brief  温度控制任务 (在FreeRTOS任务中周期调用)
  * @param  current_temp: 当前温度值
  * @retval None
+ * @note   包含上电5秒安全延迟保护，期间加热保持关闭状态
  */
 void TempCtrl_Task(float current_temp);
 
@@ -174,6 +178,7 @@ void TempCtrl_EmergencyStop(void);
 /**
  * @brief  初始化温度控制系统
  * @retval None
+ * @note   初始化后会启动5秒安全延迟，期间所有加热输出强制为0
  */
 void TempCtrl_Init(void);
 
