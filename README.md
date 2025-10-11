@@ -165,8 +165,8 @@ voltageMonitorTask (低优先级后台运行)
 
 1. **克隆仓库**
    ```bash
-   git clone https://github.com/ShenHongmiao/I2C.git
-   cd I2C
+   git clone https://github.com/ShenHongmiao/STM32F407-.git
+   cd STM32F407-
    ```
 
 2. **配置 CMake**（使用预设配置）
