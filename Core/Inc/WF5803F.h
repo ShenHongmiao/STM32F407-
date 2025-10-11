@@ -14,6 +14,6 @@
 // void WF5803F_ReadDate_Temp(int16_t* Temp);
 // void WF5803F_ReadDate_Press(int32_t* Press);
 void WF5803F_ReadDate(int16_t* Temp, int32_t* Press);
-float compute_pressure_WF5803F_7BAR_fromInt(int32_t rawData);
+float compute_pressure_WF5803F_2BAR_fromInt(int32_t rawData);
 float compute_temperature_WF5803F_fromInt(int16_t rawData);
 void WF5803F_GetData(float* temperature, float* pressure);

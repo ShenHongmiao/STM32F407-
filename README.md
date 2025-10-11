@@ -15,7 +15,7 @@
 
 ### 1. 气压温度传感器 (WF5803F)
 - **通信接口**: I2C1 (PB8/PB9)
-- **测量范围**: 0-7 Bar (气压), -40°C ~ 125°C (温度)
+- **测量范围**: 0-2 Bar (气压), -40°C ~ 125°C (温度)
 - **采样频率**: 1Hz
 - **数据输出**: 通过 UART 串口输出
 
@@ -347,11 +347,11 @@ T(°C) = T(K) - 273.15
 
 **气压量程配置 (`Core/Src/WF5803F.c`)：**
 
-当前代码支持 **7 Bar** 量程传感器，计算公式在 `compute_pressure_WF5803F_7BAR_fromInt()` 中：
+当前代码支持 **2 Bar** 量程传感器，计算公式在 `compute_pressure_WF5803F_2BAR_fromInt()` 中：
 
 ```c
-float compute_pressure_WF5803F_7BAR_fromInt(int32_t rawData) {
-    // 固定公式（7bar型号，输出 kPa）
+float compute_pressure_WF5803F_2BAR_fromInt(int32_t rawData) {
+    // 固定公式（2bar型号，输出 kPa）
     return 180.0f/0.81f*(factor-0.1f)+30.0f;
 }
 ```
@@ -360,8 +360,8 @@ float compute_pressure_WF5803F_7BAR_fromInt(int32_t rawData) {
 
 | 传感器型号 | 量程 | 计算公式 | 修改建议 |
 |-----------|------|---------|---------|
-| WF5803F-7BAR | 0-2 Bar | 当前公式 | 无需修改 |
-| WF5803F-2BAR | 0-7 Bar | 查阅数据手册 | 修改计算公式中的系数 |
+| WF5803F-2BAR | 0-2 Bar | 当前公式 | 无需修改 |
+| WF5803F-7BAR | 0-7 Bar | 查阅数据手册 | 修改计算公式中的系数 |
 | WF5803F-10BAR | 0-10 Bar | 查阅数据手册 | 修改计算公式中的系数 |
 
 ---

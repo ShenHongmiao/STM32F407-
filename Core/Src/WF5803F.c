@@ -36,7 +36,7 @@ void WF5803F_ReadDate(int16_t* Temp, int32_t* Press)
  * @param  rawData  32位整型数，存放传感器的24位原始数据
  * @return 压力值，单位 kPa
  */
-float compute_pressure_WF5803F_7BAR_fromInt(int32_t rawData) {
+float compute_pressure_WF5803F_2BAR_fromInt(int32_t rawData) {
     // 保留 24位数据
     rawData &= 0x00FFFFFF;
 
@@ -76,7 +76,7 @@ void WF5803F_GetData(float* temperature, float* pressure)
     
     // 转换为实际物理值
     *temperature = compute_temperature_WF5803F_fromInt(rawTemp);
-    *pressure = compute_pressure_WF5803F_7BAR_fromInt(rawPress);
+    *pressure = compute_pressure_WF5803F_2BAR_fromInt(rawPress);
 }
 
 
