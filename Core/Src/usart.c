@@ -21,6 +21,12 @@
 #include "usart.h"
 
 /* USER CODE BEGIN 0 */
+#include <stdarg.h>
+#include <stdio.h>
+#include <string.h>
+
+// 定义发送缓冲区大小
+#define UART_TX_BUFFER_SIZE 256
 
 /* USER CODE END 0 */
 
@@ -182,5 +188,39 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
 }
 
 /* USER CODE BEGIN 1 */
+
+/**
+ * @brief  串口1发送格式化字符串（类似printf）
+ * @param  format: 格式化字符串
+ * @param  ...: 可变参数
+ * @retval None
+ * 
+ * @note   使用示例:
+ *         send_message("Hello World!\n");
+ *         send_message("Temperature: %.2f°C\n", temp);
+ *         send_message("ADC: %d, Voltage: %.2fV\n", adc_value, voltage);
+ * 
+ * @note   此函数线程安全，可在FreeRTOS多任务环境中使用
+ */
+void send_message(const char *format, ...)
+{
+    char buffer[UART_TX_BUFFER_SIZE];
+    va_list args;
+    
+    // 开始可变参数处理
+    va_start(args, format);
+    
+    // 格式化字符串到缓冲区
+    int len = vsnprintf(buffer, UART_TX_BUFFER_SIZE, format, args);
+    
+    // 结束可变参数处理
+    va_end(args);
+    
+    // 确保不超过缓冲区大小
+    if (len > 0 && len < UART_TX_BUFFER_SIZE) {
+        // 通过串口1发送数据
+        HAL_UART_Transmit(&huart1, (uint8_t*)buffer, len, HAL_MAX_DELAY);
+    }
+}
 
 /* USER CODE END 1 */

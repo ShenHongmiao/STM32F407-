@@ -23,6 +23,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "temp_pid_ctrl.h"
 #include "cmsis_os.h"
+#include "usart.h"
 #include <math.h>
 #include <stdio.h>
 
@@ -243,7 +244,7 @@ void TempCtrl_Task(float current_temp)
     
     // 紧急温度保护
     if (current_temp >= TEMP_EMERGENCY_MAX) {
-        printf("[TEMP_CTRL] EMERGENCY! Temperature %.2f°C >= %.2f°C\n", 
+        send_message("[TEMP_CTRL] EMERGENCY! Temperature %.2f°C >= %.2f°C\n", 
                current_temp, TEMP_EMERGENCY_MAX);
         TempCtrl_EmergencyStop();
         return;
@@ -251,7 +252,7 @@ void TempCtrl_Task(float current_temp)
     
     // 安全温度保护
     if (current_temp >= TEMP_SAFE_SHUTDOWN) {
-        printf("[TEMP_CTRL] WARNING! Temperature %.2f°C >= %.2f°C, reducing power\n", 
+        send_message("[TEMP_CTRL] WARNING! Temperature %.2f°C >= %.2f°C, reducing power\n", 
                current_temp, TEMP_SAFE_SHUTDOWN);
         // 强制降低输出到30%
         PWM_SetDuty(30.0f);
@@ -294,7 +295,7 @@ void TempCtrl_EmergencyStop(void)
     PID_Reset(&g_pid);
     g_current_duty = 0.0f;
     
-    printf("[TEMP_CTRL] Emergency stop activated!\n");
+    send_message("[TEMP_CTRL] Emergency stop activated!\n");
 }
 
 /**
@@ -314,18 +315,18 @@ void TempCtrl_Init(void)
     g_heating_enabled = 1;
     g_current_duty = 0.0f;
     
-    printf("[TEMP_CTRL] Temperature Control Initialized\n");
-    printf("[TEMP_CTRL] Target Temperature: %.2f°C\n", TARGET_TEMPERATURE);
-    printf("[TEMP_CTRL] PID Parameters: Kp=%.2f, Ki=%.2f, Kd=%.2f\n", 
+    send_message("[TEMP_CTRL] Temperature Control Initialized\n");
+    send_message("[TEMP_CTRL] Target Temperature: %.2f°C\n", TARGET_TEMPERATURE);
+    send_message("[TEMP_CTRL] PID Parameters: Kp=%.2f, Ki=%.2f, Kd=%.2f\n", 
            g_pid.Kp, g_pid.Ki, g_pid.Kd);
     
     // 打印温度区间信息
     #if (TARGET_TEMPERATURE < 50.0f)
-    printf("[TEMP_CTRL] Temperature Range: LOW (30-50°C)\n");
+    send_message("[TEMP_CTRL] Temperature Range: LOW (30-50°C)\n");
     #elif (TARGET_TEMPERATURE < 70.0f)
-    printf("[TEMP_CTRL] Temperature Range: MID (50-70°C)\n");
+    send_message("[TEMP_CTRL] Temperature Range: MID (50-70°C)\n");
     #else
-    printf("[TEMP_CTRL] Temperature Range: HIGH (70-100°C)\n");
+    send_message("[TEMP_CTRL] Temperature Range: HIGH (70-100°C)\n");
     #endif
 }
 

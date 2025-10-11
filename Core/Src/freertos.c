@@ -31,6 +31,10 @@
 #include <string.h>
 #include <stdio.h>
 
+/* USER CODE BEGIN Includes */
+// 使用send_message替代printf，通过串口1发送调试信息
+/* USER CODE END Includes */
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -155,18 +159,18 @@ void StartDefaultTask(void const * argument)
   float voltage;
   uint8_t voltageStatus;
   
-  // printf("\n========================================\n");
-  // printf("System Power-On Initialization\n");
-  // printf("========================================\n");
+  // send_message("\n========================================\n");
+  // send_message("System Power-On Initialization\n");
+  // send_message("========================================\n");
   
   // 延时等待系统稳定，使用阻塞式延时确保其他任务未启动
   Delay_Blocking_ms(500);
   // ========== 上电电压检测 ==========
-  // printf("\n[BOOT] Power-on voltage check...\n");
+  // send_message("\n[BOOT] Power-on voltage check...\n");
   voltageStatus = Check_Voltage(&voltage);
   
-  // printf("Voltage: %.2fV, Status: %s\n", voltage, voltageStatus ? "OK" : "LOW");
-  // printf("Threshold: %.2fV (70%% of %.1fV)\n", VOLTAGE_THRESHOLD, VOLTAGE_NORMAL);
+  // send_message("Voltage: %.2fV, Status: %s\n", voltage, voltageStatus ? "OK" : "LOW");
+  // send_message("Threshold: %.2fV (70%% of %.1fV)\n", VOLTAGE_THRESHOLD, VOLTAGE_NORMAL);
   
   if (!voltageStatus) {
     // 电压过低，设置标志并挂起其他任务
@@ -174,9 +178,9 @@ void StartDefaultTask(void const * argument)
     
     // 发送低压警告
     Send_VoltageWarning(voltage, "LOW");
-    // printf("\n!!! LOW VOLTAGE ALERT !!!\n");
-    // printf("System will run in low-power mode.\n");
-    // printf("Sensor and NTC tasks will be suspended.\n");
+    // send_message("\n!!! LOW VOLTAGE ALERT !!!\n");
+    // send_message("System will run in low-power mode.\n");
+    // send_message("Sensor and NTC tasks will be suspended.\n");
     
     // 挂起其他任务（稍后创建时会被挂起）
     // 注意：此时其他任务可能还未创建，所以在各任务启动时检查标志
@@ -184,13 +188,13 @@ void StartDefaultTask(void const * argument)
   } else {
     // 电压正常
     Send_VoltageWarning(voltage, "OK");
-    // printf("Voltage OK. All tasks will run normally.\n");
+    // send_message("Voltage OK. All tasks will run normally.\n");
   }
   
-  // printf("\n========================================\n");
-  // printf("Initialization complete.\n");
-  // printf("Deleting default task...\n");
-  // printf("========================================\n\n");
+  // send_message("\n========================================\n");
+  // send_message("Initialization complete.\n");
+  // send_message("Deleting default task...\n");
+  // send_message("========================================\n\n");
   
   // 延时一下，确保消息打印完成
   Delay_Blocking_ms(100);
@@ -215,34 +219,34 @@ void StartSensorTask(void const * argument)
   float pressure;
   HAL_StatusTypeDef status;
 
-  // printf("SensorTask Started!\n");
+  // send_message("SensorTask Started!\n");
   
   /* Infinite loop */
   for(;;)
   {
     // 检查低压标志，如果电压过低则挂起任务
     if (g_lowVoltageFlag) {
-      printf("Sensor task suspended due to low voltage!\n");
+      send_message("Sensor task suspended due to low voltage!\n");
       vTaskSuspend(NULL);  // 挂起自己
     }
     
-    // printf("Reading sensor...\n");
+    // send_message("Reading sensor...\n");
     
     // 测试 I2C 通信
     uint8_t test_cmd = 0x0A;
     status = HAL_I2C_Mem_Write(&hi2c1, WF5803F_ADDR, WF5803F_REG_CTRL, I2C_MEMADD_SIZE_8BIT, &test_cmd, 1, 100);
     
     if (status == HAL_OK) {
-      // printf("I2C Write OK\n");
+      // send_message("I2C Write OK\n");
     } else {
-      // printf("I2C Write Failed: %d\n", status);
+      // send_message("I2C Write Failed: %d\n", status);
     }
     
     // 获取温度和气压数据
     WF5803F_GetData(&temperature, &pressure);
     
-    // 直接打印到终端
-    printf("Temp: %.2f C, Press: %.2f kPa\n", temperature, pressure);
+    // 通过串口1发送数据
+    send_message("Temp: %.2f C, Press: %.2f kPa\n", temperature, pressure);
     
     // 延时1秒
     osDelay(1000);
@@ -260,14 +264,14 @@ void StartNTCTask(void const * argument)
   uint32_t adcValue;
 
   
-  printf("=== NTC Task Started! ===\n");
+  send_message("=== NTC Task Started! ===\n");
   
   /* Infinite loop */
   for(;;)
   {
     // 检查低压标志，如果电压过低则挂起任务
     if (g_lowVoltageFlag) {
-      printf("NTC task suspended due to low voltage!\n");
+      send_message("NTC task suspended due to low voltage!\n");
       vTaskSuspend(NULL);  // 挂起自己
     }
     
@@ -277,8 +281,8 @@ void StartNTCTask(void const * argument)
     // 计算温度
     Temp_NTC = compute_ntc_temperature(adcValue);
     
-    // 打印结果
-    printf("NTC - ADC: %lu, Temp: %.2f°C\n", adcValue, Temp_NTC);
+    // 通过串口1发送结果
+    send_message("NTC - ADC: %lu, Temp: %.2f°C\n", adcValue, Temp_NTC);
     
     // 延时1秒
     osDelay(1000);
@@ -300,8 +304,8 @@ void StartVoltageMonitorTask(void const * argument)
   float voltage;
   uint8_t voltageStatus;
   
-  printf("=== Voltage Monitor Task Started (Priority: Low) ===\n");
-  printf("Check interval: %d ms (%.1f minutes)\n", VOLTAGE_CHECK_INTERVAL, VOLTAGE_CHECK_INTERVAL/60000.0f);
+  send_message("=== Voltage Monitor Task Started (Priority: Low) ===\n");
+  send_message("Check interval: %d ms (%.1f minutes)\n", VOLTAGE_CHECK_INTERVAL, VOLTAGE_CHECK_INTERVAL/60000.0f);
   
   
   // ========== 进入周期检测循环 ==========
@@ -311,10 +315,10 @@ void StartVoltageMonitorTask(void const * argument)
     osDelay(VOLTAGE_CHECK_INTERVAL);
     
     // 定期检测电压
-    printf("\n[PERIODIC] Voltage check...\n");
+    send_message("\n[PERIODIC] Voltage check...\n");
     voltageStatus = Check_Voltage(&voltage);
     
-    printf("Voltage: %.2fV\n", voltage);
+    send_message("Voltage: %.2fV\n", voltage);
     
     if (!voltageStatus) {
       // 电压过低
@@ -322,8 +326,8 @@ void StartVoltageMonitorTask(void const * argument)
         // 检测到低压，挂起其他任务
         g_lowVoltageFlag = 1;
         
-        printf("!!! LOW VOLTAGE ALERT !!!\n");
-        printf("Suspending All tasks...\n");
+        send_message("!!! LOW VOLTAGE ALERT !!!\n");
+        send_message("Suspending All tasks...\n");
         
         // 挂起其他任务
         if (sensorTaskHandle != NULL) {

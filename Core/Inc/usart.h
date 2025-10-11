@@ -45,6 +45,15 @@ void MX_USART2_UART_Init(void);
 
 /* USER CODE BEGIN Prototypes */
 
+/**
+ * @brief  串口1发送格式化字符串（类似printf）
+ * @param  format: 格式化字符串
+ * @param  ...: 可变参数
+ * @retval None
+ * @note   使用示例: send_message("Temperature: %.2f°C\n", temp);
+ */
+void send_message(const char *format, ...);
+
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus
