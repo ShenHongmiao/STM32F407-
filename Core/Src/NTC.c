@@ -29,10 +29,28 @@ float compute_ntc_temperature(uint32_t adcValue)
  */
 uint32_t Read_ADC0(void)
 {
-    // 启动 ADC 转换
-    HAL_ADC_Start(&hadc1);
-    // 等待转换完成
-    HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
-    // 读取 ADC 值
-    return HAL_ADC_GetValue(&hadc1);
+    ADC_ChannelConfTypeDef sConfig = {0};
+    uint32_t adcValue = 0;
+    
+    // 配置 ADC 通道0 (PA0 - NTC)
+    sConfig.Channel = ADC_CHANNEL_0;
+    sConfig.Rank = 1;
+    sConfig.SamplingTime = ADC_SAMPLETIME_84CYCLES;
+    
+    if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) == HAL_OK)
+    {
+        // 启动 ADC 转换
+        HAL_ADC_Start(&hadc1);
+        
+        // 等待转换完成
+        if (HAL_ADC_PollForConversion(&hadc1, 100) == HAL_OK)
+        {
+            adcValue = HAL_ADC_GetValue(&hadc1);
+        }
+        
+        // 停止 ADC
+        HAL_ADC_Stop(&hadc1);
+    }
+    
+    return adcValue;
 }
