@@ -157,6 +157,70 @@ voltageMonitorTask (低优先级后台运行)
 - STM32CubeMX
 - STM32 Programmer CLI (用于烧录)
 
+### 首次克隆项目后的构建步骤
+
+⚠️ **重要提示**：本项目的 `.gitignore` 已配置排除所有编译缓存和构建产物，因此从 Git 克隆后需要完整构建。
+
+**第一次构建的完整步骤：**
+
+1. **克隆仓库**
+   ```bash
+   git clone https://github.com/ShenHongmiao/I2C.git
+   cd I2C
+   ```
+
+2. **配置 CMake**（使用预设配置）
+   ```bash
+   cmake --preset Debug
+   ```
+
+3. **编译项目**
+   ```bash
+   cmake --build build/Debug
+   ```
+
+4. **烧录到开发板**（方式一：使用 CMake Task）
+   - 在 VS Code 中按 `Ctrl+Shift+P`
+   - 选择 `Tasks: Run Task`
+   - 选择 `Build + Flash`
+
+5. **烧录到开发板**（方式二：命令行）
+   ```bash
+   STM32_Programmer_CLI --connect port=swd --download build/Debug/I2C.elf -hardRst -rst --start
+   ```
+
+**常见问题排查：**
+
+| 问题 | 原因 | 解决方法 |
+|------|------|---------|
+| CMake 找不到工具链 | 未设置 ARM GCC 路径 | 检查 `cmake/gcc-arm-none-eabi.cmake` 中的工具链路径 |
+| 找不到可执行文件 | 未构建或路径错误 | 运行 `cmake --build build/Debug` 重新编译 |
+| ST-Link 连接失败 | 硬件未连接或驱动问题 | 检查 ST-Link 连接，安装 ST-Link 驱动 |
+| 路径包含中文报错 | CMake 不支持中文路径 | 将项目移动到纯英文路径 |
+
+**`.gitignore` 已排除的文件：**
+- ✅ `build/` - CMake 构建输出目录
+- ✅ `*.elf`, `*.bin`, `*.hex`, `*.map` - 编译生成的可执行文件
+- ✅ `CMakeCache.txt`, `CMakeFiles/` - CMake 缓存
+- ✅ `*.o`, `*.obj` - 目标文件
+- ✅ `.ninja_deps`, `.ninja_log`, `build.ninja` - Ninja 构建文件
+
+这些文件不会提交到 Git，因此每次克隆后都需要重新构建。
+
+### 串口输出示例
+
+**正常运行输出：**
+
+```
+System Init...
+[STARTUP] Voltage check on boot...
+Voltage: 24.10V
+System voltage normal. All tasks running.
+---
+WF5803F Pressure: 101.25 kPa, Temperature: 25.3°C
+NTC Temperature: 24.8°C
+---
+```
 
 ### 低压警告输出
 
@@ -192,6 +256,15 @@ NTC task suspended due to low voltage!
    - 低压保护触发后，传感器任务会被挂起
    - 需要重启系统才能恢复正常运行
    - 电压监控任务会持续发送低压警告
+
+6. **Git 克隆与构建**:
+   - ⚠️ 本项目 `.gitignore` 已排除所有编译产物和构建缓存
+   - 从 Git 克隆后必须重新运行 CMake 配置和编译
+   - 如果遇到 "找不到可执行文件" 错误，请先执行：
+     1. `cmake --preset Debug`
+     2. `cmake --build build/Debug`
+   - 不同电脑环境可能需要调整 `cmake/gcc-arm-none-eabi.cmake` 中的工具链路径
+   - 建议使用纯英文路径，避免中文路径导致的 CMake 错误
 
 ## 开发工具
 
@@ -351,18 +424,74 @@ T(°C) = T(K) - 273.15
 
 ```c
 float compute_pressure_WF5803F_2BAR_fromInt(int32_t rawData) {
+    // 保留 24位数据
+    rawData &= 0x00FFFFFF;
+    
+    // 如果最高位 (bit23) 为1，则需要做符号扩展
+    if (rawData & 0x00800000) {
+        rawData |= 0xFF000000;
+    }
+    
+    // 归一化到 [-1, +1)
+    float factor = (float)rawData / 8388608.0f;  // 除以 2^23 (n = factor)
+    
     // 固定公式（2bar型号，输出 kPa）
     return 180.0f/0.81f*(factor-0.1f)+30.0f;
 }
 ```
 
-**如需更换其他量程型号，需修改公式：**
+**支持的传感器型号及计算公式：**
 
-| 传感器型号 | 量程 | 计算公式 | 修改建议 |
-|-----------|------|---------|---------|
-| WF5803F-2BAR | 0-2 Bar | 当前公式 | 无需修改 |
-| WF5803F-7BAR | 0-7 Bar | 查阅数据手册 | 修改计算公式中的系数 |
-| WF5803F-10BAR | 0-10 Bar | 查阅数据手册 | 修改计算公式中的系数 |
+所有公式中 `n = factor`（归一化值，范围 [-1, +1)），输出单位均为 **kPa**。
+**⚠️注意：除了本项目使用的型号外，均未进行测试，不保证其他型号公式正确可以正常使用。**
+
+#### WF5803F 系列（气压传感器）
+
+| 型号 | 量程 | 计算公式 | C 代码实现 |
+|------|------|---------|-----------|
+| **WF5803F-1BAR** | 0-1 Bar | P = 125×n + 17.5 | `return 125.0f*factor + 17.5f;` |
+| **WF5803F-2BAR** ⭐ | 0-2 Bar | P = (180/0.81)×(n-0.1) + 30 | `return 180.0f/0.81f*(factor-0.1f)+30.0f;` |
+| **WF5803F-7BAR** | 0-7 Bar | P = 1000×n - 50 | `return 1000.0f*factor - 50.0f;` |
+| **WF5803F-12BAR** | 0-12 Bar | P = 700×n + 530 | `return 700.0f*factor + 530.0f;` |
+
+⭐ 表示当前代码使用的型号
+
+#### WF100D 系列（差压传感器）
+
+| 型号 | 量程 | 计算公式 | C 代码实现 |
+|------|------|---------|-----------|
+| **WF100D-5KPA** | 0-5 kPa | P = 5×n + 0.25 | `return 5.0f*factor + 0.25f;` |
+| **WF100D-10KPA** | 0-10 kPa | P = 15×n + 2 | `return 15.0f*factor + 2.0f;` |
+| **WF100D-40KPA** | 0-40 kPa | P = 50×n + 5 | `return 50.0f*factor + 5.0f;` |
+| **WF100D-100KPA** | 0-100 kPa | P = 125×n - 12.5 | `return 125.0f*factor - 12.5f;` |
+| **WF100D-200KPA** | 0-200 kPa | P = 250×n + 25 | `return 250.0f*factor + 25.0f;` |
+| **WF100D-300KPA** | 0-300 kPa | P = 400×n + 10 | `return 400.0f*factor + 10.0f;` |
+
+#### WF200D 系列（差压传感器）
+
+| 型号 | 量程 | 计算公式 | C 代码实现 |
+|------|------|---------|-----------|
+| **WF200D-5KPA** | 0-5 kPa | P = 5×n + 0.25 | `return 5.0f*factor + 0.25f;` |
+
+**更换传感器型号的步骤：**
+
+1. **修改头文件** (`Core/Inc/WF5803F.h`)：
+   - 将函数名改为对应型号，例如：`compute_pressure_WF5803F_7BAR_fromInt()`
+
+2. **修改源文件** (`Core/Src/WF5803F.c`)：
+   - 修改函数定义和函数调用
+   - 更换计算公式（从上表中复制对应的 C 代码）
+
+3. **示例：更换为 7BAR 型号**
+   ```c
+   // 原公式（2BAR）
+   return 180.0f/0.81f*(factor-0.1f)+30.0f;
+   
+   // 替换为（7BAR）
+   return 1000.0f*factor - 50.0f;
+   ```
+
+4. **重新编译并烧录程序**
 
 ---
 
