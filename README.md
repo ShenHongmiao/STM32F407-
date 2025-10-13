@@ -14,12 +14,14 @@
 ## 功能特性
 
 ### 1. 气压温度传感器 (WF5803F)
+
 - **通信接口**: I2C1 (PB8/PB9)
 - **测量范围**: 0-2 Bar (气压), -40°C ~ 125°C (温度)
 - **采样频率**: 1Hz
 - **数据输出**: 通过 UART 串口输出
 
 ### 2. NTC 温度检测
+
 - **硬件接口**: ADC1_IN0 (PA0)
 - **传感器类型**: 10kΩ NTC 热敏电阻 (B=3380)
 - **电路配置**: 分压电路 (10kΩ串联电阻)
@@ -27,21 +29,24 @@
 - **温度范围**: -40°C ~ 125°C
 
 ### 3. 电源电压监控
+
 - **检测引脚**: PC4 (V_DETECT)
 - **检测方式**: ADC采样
-- **监控策略**: 
+- **监控策略**:
   - 上电时立即检测电压
   - 运行时每 10 分钟检测一次
   - 低于 70% 阈值时挂起传感器任务并发送警告
 - **低压保护**: 自动挂起非关键任务以降低功耗
 
 ### 4. NMOS 控制输出
+
 - **控制引脚**: PC6, PC7, PC8, PC9
 - **功能**: 4路 NMOS 驱动控制
 
 ## 引脚定义
 
 ### 电源引脚
+
 | 核心板引脚 | STM32引脚 | 功能描述 |
 |-----------|----------|---------|
 | 2, 4 | +5V | 5V 电源输入 |
@@ -50,6 +55,7 @@
 | 3 | AGND | 模拟地 |
 
 ### I2C 接口
+
 | 核心板引脚 | STM32引脚 | 功能 | 备注 |
 |-----------|----------|------|------|
 | 44 | PB8 | I2C1_SCL | WF5803F 气压传感器 |
@@ -58,6 +64,7 @@
 | 19 | PE9 | I2C2_SDA | 预留 I2C2 接口 |
 
 ### ADC 接口
+
 | 核心板引脚 | STM32引脚 | 通道 | 功能 |
 |-----------|----------|------|------|
 | 5 | PA0 | ADC1_IN0 | NTC 温度传感器 |
@@ -65,6 +72,7 @@
 | 13 | PC4 | - | V_DETECT 电压检测 |
 
 ### UART 接口
+
 | 核心板引脚 | STM32引脚 | 功能 | 用途 |
 |-----------|----------|------|------|
 | 48 | PB6 | UART1_TX | 调试串口输出 |
@@ -73,6 +81,7 @@
 | 36 | PD6 | UART2_RX | 预留串口 |
 
 ### GPIO 控制
+
 | 核心板引脚 | STM32引脚 | 功能 | 备注 |
 |-----------|----------|------|------|
 | 59 | PC6 | NMOS1_G | NMOS 1 栅极控制 |
@@ -81,6 +90,7 @@
 | 54 | PC8 | NMOS4_G | NMOS 4 栅极控制 |
 
 ### 调试接口
+
 | 核心板引脚 | STM32引脚 | 功能 |
 |-----------|----------|------|
 | 55 | PA14 | SWDIO |
@@ -100,7 +110,7 @@
 
 ### 任务执行流程
 
-```
+```text
 系统上电
    ↓
 defaultTask (最高优先级)
@@ -124,7 +134,7 @@ voltageMonitorTask (低优先级后台运行)
 
 1. **上电检测**: 系统启动后立即检测电压
 2. **周期检测**: 运行期间每 10 分钟检测一次
-3. **动作策略**: 
+3. **动作策略**:
    - 电压 < 70% 阈值: 挂起传感器任务，持续发送低压警告
    - 电压正常: 发送正常消息
 4. **恢复策略**: 需要重启系统才能恢复任务运行
@@ -132,17 +142,20 @@ voltageMonitorTask (低优先级后台运行)
 ## 外设配置
 
 ### I2C1 配置
+
 - **速度**: 100 kHz (标准模式)
 - **地址模式**: 7-bit
 - **设备地址**: 0x6C (WF5803F)
 
 ### ADC1 配置
+
 - **分辨率**: 12-bit (0-4095)
 - **参考电压**: 3.3V
 - **采样时间**: 15 cycles
 - **触发方式**: 软件触发
 
 ### UART1 配置
+
 - **波特率**: 115200
 - **数据位**: 8
 - **停止位**: 1
@@ -152,6 +165,7 @@ voltageMonitorTask (低优先级后台运行)
 ## 编译与烧录
 
 ### 环境要求
+
 - CMake 3.20+
 - ARM GCC Toolchain
 - STM32CubeMX
@@ -164,17 +178,20 @@ voltageMonitorTask (低优先级后台运行)
 **第一次构建的完整步骤：**
 
 1. **克隆仓库**
+
    ```bash
    git clone https://github.com/ShenHongmiao/STM32F407-.git
    cd STM32F407-
    ```
 
 2. **配置 CMake**（使用预设配置）
+
    ```bash
    cmake --preset Debug
    ```
 
 3. **编译项目**
+
    ```bash
    cmake --build build/Debug
    ```
@@ -185,6 +202,7 @@ voltageMonitorTask (低优先级后台运行)
    - 选择 `Build + Flash`
 
 5. **烧录到开发板**（方式二：命令行）
+
    ```bash
    STM32_Programmer_CLI --connect port=swd --download build/Debug/I2C.elf -hardRst -rst --start
    ```
@@ -199,6 +217,7 @@ voltageMonitorTask (低优先级后台运行)
 | 路径包含中文报错 | CMake 不支持中文路径 | 将项目移动到纯英文路径 |
 
 **`.gitignore` 已排除的文件：**
+
 - ✅ `build/` - CMake 构建输出目录
 - ✅ `*.elf`, `*.bin`, `*.hex`, `*.map` - 编译生成的可执行文件
 - ✅ `CMakeCache.txt`, `CMakeFiles/` - CMake 缓存
@@ -211,7 +230,7 @@ voltageMonitorTask (低优先级后台运行)
 
 **正常运行输出：**
 
-```
+```text
 System Init...
 [STARTUP] Voltage check on boot...
 Voltage: 24.10V
@@ -224,7 +243,7 @@ NTC Temperature: 24.8°C
 
 ### 低压警告输出
 
-```
+```text
 [PERIODIC] Voltage check...
 Voltage: 3.20V
 !!! LOW VOLTAGE ALERT !!!
@@ -235,32 +254,32 @@ NTC task suspended due to low voltage!
 
 ## 注意事项
 
-1. **电源要求**: 
+1. **电源要求**
    - 输入电压: 24V (±5%)
    - 建议使用稳定的电源适配器
    - 低压阈值: 16.8V (70% of 24)
 
-2. **I2C 上拉电阻**: 
+2. **I2C 上拉电阻**
    - 确保 I2C 总线有 4.7kΩ 上拉电阻
    - WF5803F 需要稳定的电源供应
 
-3. **NTC 接线**: 
+3. **NTC 接线**
    - NTC 与 10kΩ 串联电阻构成分压电路
    - 确保 PA0 与 AGND 之间连接正确
 
-4. **调试接口**: 
+4. **调试接口**
    - 使用 ST-Link V2 或兼容调试器
    - SWD 接口: SWDIO (PA14), SWCLK (PC11)
 
-5. **任务挂起**: 
+5. **任务挂起**
    - 低压保护触发后，传感器任务会被挂起
    - 需要重启系统才能恢复正常运行
    - 电压监控任务会持续发送低压警告
 
-6. **Git 克隆与构建**:
+6. **Git 克隆与构建**
    - ⚠️ 本项目 `.gitignore` 已排除所有编译产物和构建缓存
    - 从 Git 克隆后必须重新运行 CMake 配置和编译
-   - 如果遇到 "找不到可执行文件" 错误，请先执行：
+   - 如果遇到 "找不到可执行文件" 错误，请先执行:
      1. `cmake --preset Debug`
      2. `cmake --build build/Debug`
    - 不同电脑环境可能需要调整 `cmake/gcc-arm-none-eabi.cmake` 中的工具链路径
@@ -276,7 +295,7 @@ NTC task suspended due to low voltage!
 
 ## 项目结构
 
-```
+```text
 I2C/
 ├── Core/
 │   ├── Inc/               # 头文件
@@ -343,12 +362,14 @@ I2C/
 | 使用外部参考电压 | `ADC_VREF` | `#define ADC_VREF 3.0f` |
 
 **分压电阻计算公式：**
-```
+
+```text
 ADC_IN = V_SOURCE × (R2 / (R1 + R2))
 V_SOURCE = ADC_IN × (R1 + R2) / R2
 ```
 
 **注意事项：**
+
 - ADC 输入电压不得超过 3.3V
 - 分压比应确保：`V_SOURCE_MAX × VOLTAGE_RATIO ≤ 3.3V`
 - 例如 24V 系统：`24V × 0.0909 = 2.18V < 3.3V` ✅
@@ -375,8 +396,8 @@ V_SOURCE = ADC_IN × (R1 + R2) / R2
 
 | 场景 | 需要修改的宏 | 修改示例 |
 |------|------------|---------|
-| 更换 NTC 型号 (B=3950) | `NTC_BETA`, `NTC_R0` | `#define NTC_BETA 3950.0f`<br>`#define NTC_R0 10000.0f` |
-| 使用 100kΩ NTC | `NTC_R0`, `NTC_R_SERIES` | `#define NTC_R0 100000.0f`<br>`#define NTC_R_SERIES 100000.0f` |
+| 更换 NTC 型号 (B=3950) | `NTC_BETA`, `NTC_R0` | `#define NTC_BETA 3950.0f` 和 `#define NTC_R0 10000.0f` |
+| 使用 100kΩ NTC | `NTC_R0`, `NTC_R_SERIES` | `#define NTC_R0 100000.0f` 和 `#define NTC_R_SERIES 100000.0f` |
 | 更换串联电阻 | `NTC_R_SERIES` | `#define NTC_R_SERIES 4700.0f` |
 
 **常见 NTC 型号参数：**
@@ -388,7 +409,8 @@ V_SOURCE = ADC_IN × (R1 + R2) / R2
 | NTCLE100E3 | 10kΩ | 3977 | -40°C ~ 125°C |
 
 **温度计算公式 (Steinhart-Hart 简化)：**
-```
+
+```text
 R_NTC = R_SERIES × (ADC_MAX / ADC_VALUE - 1)
 T(K) = 1 / (1/T0 + (1/BETA) × ln(R_NTC/R0))
 T(°C) = T(K) - 273.15
@@ -483,6 +505,7 @@ float compute_pressure_WF5803F_2BAR_fromInt(int32_t rawData) {
    - 更换计算公式（从上表中复制对应的 C 代码）
 
 3. **示例：更换为 7BAR 型号**
+
    ```c
    // 原公式（2BAR）
    return 180.0f/0.81f*(factor-0.1f)+30.0f;
@@ -519,6 +542,7 @@ osThreadDef(voltageMonitor, StartVoltageMonitorTask, osPriorityLow, 0, 256);
 | 减少栈大小节省内存 | 栈大小参数 | 将 512 改为 256 (需确保不会栈溢出) |
 
 **可用的优先级等级：**
+
 - `osPriorityIdle` - 空闲
 - `osPriorityLow` - 低
 - `osPriorityBelowNormal` - 低于正常
@@ -569,6 +593,7 @@ void StartSensorTask(void const * argument) {
 4. 重新生成代码
 
 **常用波特率：**
+
 - 9600 (低速，兼容性好)
 - 115200 (当前配置) ⭐
 - 460800 (高速数据传输)
@@ -579,6 +604,7 @@ void StartSensorTask(void const * argument) {
 ### 6. 常见调试场景快速配置
 
 #### 场景 1: 更换为 12V 电源系统
+
 ```c
 // V_detect.h
 #define VOLTAGE_NORMAL       12.0f
@@ -588,6 +614,7 @@ void StartSensorTask(void const * argument) {
 ```
 
 #### 场景 2: 提高传感器采样率到 10Hz
+
 ```c
 // freertos.c - StartSensorTask()
 osDelay(100);  // 改为 100ms (10Hz)
@@ -597,12 +624,14 @@ osDelay(100);  // 改为 100ms (10Hz)
 ```
 
 #### 场景 3: 缩短电压监控间隔到 1 分钟
+
 ```c
 // freertos.c
 #define VOLTAGE_CHECK_INTERVAL  60000  // 1分钟
 ```
 
 #### 场景 4: 更换为 100kΩ NTC
+
 ```c
 // NTC.h
 #define NTC_R0         100000.0f
@@ -610,13 +639,12 @@ osDelay(100);  // 改为 100ms (10Hz)
 #define NTC_BETA       3950.0f    // 根据实际型号修改
 ```
 
-
-
 ### 7. TIM3硬件PWM配置
 
 本项目已将加热MOS管（PC6/PC7）改为由TIM3定时器硬件PWM输出控制，周期为1000ms，占空比可调。
 
 #### 主要修改内容
+
 - 在 `main.c` 中添加了 `MX_TIM3_Init()`，配置TIM3为PWM输出，周期1000ms。
 - 在 `gpio.c` 中将 PC6/PC7 配置为定时器复用功能（TIM3_CH1/CH2），用于PWM输出。
 - 在 `main.c` 初始化流程中调用 TIM3初始化和启动PWM。
@@ -629,10 +657,13 @@ osDelay(100);  // 改为 100ms (10Hz)
 
 2. **设置占空比**
    - 在温度控制任务或PID计算后，调用：
+
      ```c
      Set_Heating_PWM(duty_ms); // duty_ms范围0-1000
      ```
+
    - 例如：
+
      ```c
      uint16_t duty_ms = (uint16_t)PID_Compute(...);
      Set_Heating_PWM(duty_ms);
@@ -650,12 +681,14 @@ osDelay(100);  // 改为 100ms (10Hz)
 #### CubeMX/手动配置说明
 
 如需在CubeMX中配置：
+
 - TIM3模式选择为PWM Generation CH1/CH2
 - PC6/PC7选择为TIM3_CH1/CH2复用功能
 - Prescaler设置为 (SystemCoreClock/10000)-1
 - Period设置为9999
 
 #### 兼容性说明
+
 - 该方案不再依赖软件PWM，不受FreeRTOS任务调度影响，PWM波形精确稳定。
 - 只需调用 `Set_Heating_PWM()` 即可实现加热功率调节。
 

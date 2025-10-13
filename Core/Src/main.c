@@ -99,9 +99,9 @@ int main(void)
   MX_I2C2_Init();
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
-    MX_TIM3_Init(); // 初始化TIM3为PWM输出
-    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1); // 启动CH1 PWM
-    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2); // 启动CH2 PWM
+  MX_TIM3_Init(); // 初始化TIM3为PWM输出
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1); // 启动CH1 PWM
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2); // 启动CH2 PWM
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -194,7 +194,7 @@ void MX_TIM3_Init(void)
   // 配置通道1
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
   sConfigOC.Pulse = 0; // 初始占空比0ms
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_LOW;  // 低极性：占空比0=高电平=加热关闭
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1);
 

@@ -156,8 +156,8 @@ void StartDefaultTask(void const * argument)
   // send_message("\n========================================\n");
   // send_message("System Power-On Initialization\n");
   // send_message("========================================\n");
-  NMOS1_OFF();
-  NMOS2_OFF();
+  Set_Heating_PWM(0); // 确保加热关闭
+  
   // 延时等待系统稳定，使用阻塞式延时确保其他任务未启动
   Delay_Blocking_ms(500);
   // ========== 上电电压检测 ==========
