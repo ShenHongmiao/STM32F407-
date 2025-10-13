@@ -23,6 +23,7 @@
 #include "i2c.h"
 #include "usart.h"
 #include "gpio.h"
+#include "stm32f4xx_hal_tim.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -47,6 +48,8 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+
+TIM_HandleTypeDef htim3; // TIM3句柄
 
 /* USER CODE END PV */
 
@@ -96,6 +99,9 @@ int main(void)
   MX_I2C2_Init();
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
+    MX_TIM3_Init(); // 初始化TIM3为PWM输出
+    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1); // 启动CH1 PWM
+    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2); // 启动CH2 PWM
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -166,6 +172,36 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+/**
+ * @brief TIM3 PWM初始化，周期1000ms，占空比可调
+ */
+void MX_TIM3_Init(void)
+{
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  // TIM3时钟使能
+  __HAL_RCC_TIM3_CLK_ENABLE();
+
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = (SystemCoreClock / 10000) - 1; // 10kHz计数频率
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 9999; // 10000计数=1000ms周期
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  HAL_TIM_PWM_Init(&htim3);
+
+  // 配置通道1
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0; // 初始占空比0ms
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1);
+
+  // 配置通道2
+  sConfigOC.Pulse = 0;
+  HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_2);
+}
 
 /* USER CODE END 4 */
 

@@ -9,12 +9,12 @@
   * 此文件实现了基于PID算法的温度控制功能
   * 
   * 硬件配置:
-  * - PC6: NMOS1_G (加热控制1) - 低电平导通，高电平关断
-  * - PC7: NMOS2_G (加热控制2) - 低电平导通，高电平关断
+  * - PC6: TIM3_CH1 (加热控制1) - 硬件PWM输出
+  * - PC7: TIM3_CH2 (加热控制2) - 硬件PWM输出
   * 
   * 控制策略:
-  * - 使用软件PWM控制NMOS占空比
-  * - PID算法计算占空比 (0-100%)
+  * - 使用TIM3硬件PWM控制NMOS占空比 (周期1000ms)
+  * - PID算法计算占空比 (0-1000ms)
   * - 温度过高时紧急关断加热
   *
   ******************************************************************************
@@ -26,6 +26,9 @@
 #include "usart.h"
 #include <math.h>
 #include <stdio.h>
+#include "stm32f4xx_hal_tim.h"
+
+extern TIM_HandleTypeDef htim3; // TIM3句柄
 
 /* Private typedef -----------------------------------------------------------*/
 
@@ -35,14 +38,23 @@
 
 /* Private variables ---------------------------------------------------------*/
 static PID_Controller_t g_pid;                    // 全局PID控制器
-static volatile uint16_t g_current_duty_ms = 0;   // 当前占空比(毫秒数)
-static volatile uint8_t g_heating_enabled = 1;    // 加热使能标志
-static volatile uint32_t g_pwm_counter = 0;       // PWM计数器
 
 /* Private function prototypes -----------------------------------------------*/
 static float Clamp(float value, float min, float max);
 
 /* Function implementations --------------------------------------------------*/
+
+/**
+ * @brief  设置加热MOS管硬件PWM占空比（0-10000）
+ * @param  duty_ms: 0-1000ms（实际PWM周期为1000ms）
+ */
+void Set_Heating_PWM(uint16_t duty_ms)
+{
+    if (duty_ms > 1000) duty_ms = 1000;
+    uint32_t pulse = duty_ms * 10; // 1000ms对应10000计数
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, pulse); // PC6
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, pulse); // PC7
+}
 
 /**
  * @brief  初始化PID控制器
@@ -162,60 +174,16 @@ static float Clamp(float value, float min, float max)
 }
 
 /**
- * @brief  控制MOS管占空比（软件PWM）
- * @param  duty_ms: 1000ms周期内的导通毫秒数 (0-1000ms)
- * @retval None
- * @note   此函数应在FreeRTOS任务中以约1ms间隔周期调用
- *         实现基于1000ms周期的软件PWM控制
- */
-void MOS_Control(uint16_t duty_ms)
-{
-    // 限制占空比范围 (0-1000ms)
-    if (duty_ms > PWM_MAX_DUTY_MS) {
-        duty_ms = PWM_MAX_DUTY_MS;
-    }
-    
-    // 保存当前占空比
-    g_current_duty_ms = duty_ms;
-    
-    // 检查是否使能加热
-    if (!g_heating_enabled) {
-        NMOS1_OFF();
-        NMOS2_OFF();
-        return;
-    }
-    
-    // PWM计数器递增
-    g_pwm_counter++;
-    if (g_pwm_counter >= PWM_PERIOD_MS) {
-        g_pwm_counter = 0;
-    }
-    
-    // 根据占空比控制NMOS
-    // 注意: NMOS低电平导通，高电平关断
-    if (g_pwm_counter < duty_ms) {
-        // PWM高电平期间 - NMOS导通
-        NMOS1_ON();
-        NMOS2_ON();
-    } else {
-        // PWM低电平期间 - NMOS关断
-        NMOS1_OFF();
-        NMOS2_OFF();
-    }
-}
-
-/**
  * @brief  紧急关闭加热
  * @retval None
  */
 void TempCtrl_EmergencyStop(void)
 {
-    g_heating_enabled = 0;
-    NMOS1_OFF();
-    NMOS2_OFF();
+    // 关闭硬件PWM输出
+    Set_Heating_PWM(0);
+    
+    // 重置PID控制器
     PID_Reset(&g_pid);
-    g_current_duty_ms = 0;
-    g_pwm_counter = 0;
     
     send_message("[TEMP_CTRL] Emergency stop activated!\n");
 }
@@ -229,20 +197,14 @@ void TempCtrl_Init(void)
     // 初始化PID控制器
     PID_Init(&g_pid);
     
-    // 初始化NMOS为关断状态
-    NMOS1_OFF();
-    NMOS2_OFF();
-    
-    // 使能加热
-    g_heating_enabled = 1;
-    g_current_duty_ms = 0;
-    g_pwm_counter = 0;
+    // 初始化硬件PWM为关断状态
+    Set_Heating_PWM(0);
     
     send_message("[TEMP_CTRL] Temperature Control Initialized\n");
     send_message("[TEMP_CTRL] Target Temperature: %.2f°C\n", TARGET_TEMPERATURE);
     send_message("[TEMP_CTRL] PID Parameters: Kp=%.2f, Ki=%.2f, Kd=%.2f\n", 
            g_pid.Kp, g_pid.Ki, g_pid.Kd);
-    send_message("[TEMP_CTRL] PWM Period: %dms\n", PWM_PERIOD_MS);
+    send_message("[TEMP_CTRL] Hardware PWM Mode (TIM3), Period: %dms\n", PWM_PERIOD_MS);
     
     // 打印温度区间信息
     #if (TARGET_TEMP_INT < 50)

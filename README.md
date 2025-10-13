@@ -612,30 +612,70 @@ osDelay(100);  // 改为 100ms (10Hz)
 
 
 
-### 7.重要注意事项
+### 7. TIM3硬件PWM配置
 
-⚠️ **修改宏定义后必须做的事：**
-1. 清理编译缓存：`CMake: clean rebuild`
-2. 重新烧录程序
-3. 验证硬件连接是否与软件配置匹配
-4. 检查分压电阻是否会导致 ADC 过压
+本项目已将加热MOS管（PC6/PC7）改为由TIM3定时器硬件PWM输出控制，周期为1000ms，占空比可调。
 
-⚠️ **常见错误排查：**
-- **I2C 无响应**: 检查上拉电阻、设备地址、供电
-- **ADC 读数异常**: 检查参考电压、分压比、接线
-- **任务卡死**: 检查栈大小、死锁、优先级配置
-- **串口无输出**: 检查波特率、TX/RX 引脚、重定向配置
+#### 主要修改内容
+- 在 `main.c` 中添加了 `MX_TIM3_Init()`，配置TIM3为PWM输出，周期1000ms。
+- 在 `gpio.c` 中将 PC6/PC7 配置为定时器复用功能（TIM3_CH1/CH2），用于PWM输出。
+- 在 `main.c` 初始化流程中调用 TIM3初始化和启动PWM。
+- 在 `temp_pid_ctrl.c` 中添加了 `Set_Heating_PWM(uint16_t duty_ms)`，用于设置占空比（0-1000ms）。
 
-## 版本历史
+#### 使用方法
 
-### v1.0.0 (2025-10-11)
-- ✅ 实现 WF5803F 气压温度传感器驱动
-- ✅ 实现 NTC 热敏电阻温度采集
-- ✅ 实现电源电压监控与低压保护
-- ✅ FreeRTOS 多任务调度
-- ✅ UART 串口数据输出
-- ✅ 4 路 NMOS 驱动控制接口
+1. **初始化**
+   - 在 `main.c` 的初始化流程中已自动调用 `MX_TIM3_Init()` 和 `HAL_TIM_PWM_Start()`，无需手动启动。
 
+2. **设置占空比**
+   - 在温度控制任务或PID计算后，调用：
+     ```c
+     Set_Heating_PWM(duty_ms); // duty_ms范围0-1000
+     ```
+   - 例如：
+     ```c
+     uint16_t duty_ms = (uint16_t)PID_Compute(...);
+     Set_Heating_PWM(duty_ms);
+     ```
 
+3. **引脚说明**
+   - PC6: TIM3_CH1 (PWM输出)
+   - PC7: TIM3_CH2 (PWM输出)
 
-*最后更新: 2025年10月11日*
+4. **定时器参数说明**
+   - 计数频率：10kHz
+   - 周期：9999（对应1000ms）
+   - 占空比设置范围：0-1000ms（实际传入Set_Heating_PWM后会自动转换为0-10000计数）
+
+#### CubeMX/手动配置说明
+
+如需在CubeMX中配置：
+- TIM3模式选择为PWM Generation CH1/CH2
+- PC6/PC7选择为TIM3_CH1/CH2复用功能
+- Prescaler设置为 (SystemCoreClock/10000)-1
+- Period设置为9999
+
+#### 兼容性说明
+- 该方案不再依赖软件PWM，不受FreeRTOS任务调度影响，PWM波形精确稳定。
+- 只需调用 `Set_Heating_PWM()` 即可实现加热功率调节。
+
+#### 相关代码片段
+
+```c
+// main.c
+MX_TIM3_Init();
+HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
+
+// temp_pid_ctrl.c
+void Set_Heating_PWM(uint16_t duty_ms)
+{
+    if (duty_ms > 1000) duty_ms = 1000;
+    uint32_t pulse = duty_ms * 10; // 1000ms对应10000计数
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, pulse); // PC6
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, pulse); // PC7
+}
+```
+
+---
+如有疑问可随时联系开发者。

@@ -100,12 +100,6 @@ typedef struct {
 #define TEMP_EMERGENCY_MAX      80.0f   // 紧急最高温度限制 (°C)
 #define TEMP_SAFE_SHUTDOWN      75.0f   // 安全关机温度 (°C)
 
-/* NMOS控制引脚配置 */
-#define NMOS1_ON()              HAL_GPIO_WritePin(NMOS1_G_GPIO_Port, NMOS1_G_Pin, GPIO_PIN_RESET)
-#define NMOS1_OFF()             HAL_GPIO_WritePin(NMOS1_G_GPIO_Port, NMOS1_G_Pin, GPIO_PIN_SET)
-#define NMOS2_ON()              HAL_GPIO_WritePin(NMOS2_G_GPIO_Port, NMOS2_G_Pin, GPIO_PIN_RESET)
-#define NMOS2_OFF()             HAL_GPIO_WritePin(NMOS2_G_GPIO_Port, NMOS2_G_Pin, GPIO_PIN_SET)
-
 /* Exported macro ------------------------------------------------------------*/
 
 /* Exported functions prototypes ---------------------------------------------*/
@@ -141,12 +135,12 @@ void PID_SetSetpoint(PID_Controller_t *pid, float setpoint);
 void PID_Reset(PID_Controller_t *pid);
 
 /**
- * @brief  控制MOS管占空比（软件PWM）
+ * @brief  设置加热MOS管硬件PWM占空比
  * @param  duty_ms: 1000ms周期内的导通毫秒数 (0-1000ms)
  * @retval None
- * @note   在FreeRTOS任务中以约1ms间隔周期调用此函数
+ * @note   使用TIM3硬件PWM输出，无需周期调用
  */
-void MOS_Control(uint16_t duty_ms);
+void Set_Heating_PWM(uint16_t duty_ms);
 
 /**
  * @brief  紧急关闭加热

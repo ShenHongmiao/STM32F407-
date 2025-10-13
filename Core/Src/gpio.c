@@ -52,14 +52,21 @@ void MX_GPIO_Init(void)
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, NMOS1_G_Pin|NMOS2_G_Pin|NMOS3_G_Pin|NMOS4_G_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : NMOS1_G_Pin NMOS2_G_Pin NMOS3_G_Pin NMOS4_G_Pin */
-  GPIO_InitStruct.Pin = NMOS1_G_Pin|NMOS2_G_Pin|NMOS3_G_Pin|NMOS4_G_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+    // 配置PC6/PC7为定时器复用功能（TIM3_CH1/CH2）
+    GPIO_InitStruct.Pin = NMOS1_G_Pin|NMOS2_G_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Alternate = GPIO_AF2_TIM3;
+    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+    // 其他NMOS管仍为普通输出
+    GPIO_InitStruct.Pin = NMOS3_G_Pin|NMOS4_G_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
 }
 
