@@ -30,7 +30,7 @@
 #include "adc.h"
 #include <string.h>
 #include <stdio.h>
-
+#include "temp_pid_ctrl.h"
 /* USER CODE BEGIN Includes */
 // 使用send_message替代printf，通过串口1发送调试信息
 /* USER CODE END Includes */
@@ -60,8 +60,7 @@
 volatile uint8_t g_lowVoltageFlag = 0;  // 低电压标志: 0=正常, 1=低压
 /* USER CODE END Variables */
 osThreadId defaultTaskHandle;
-osThreadId sensorTaskHandle;
-osThreadId ntcTaskHandle;
+osThreadId Sensors_and_computeHandle;
 osThreadId voltageMonitorHandle;
 
 /* Private function prototypes -----------------------------------------------*/
@@ -70,8 +69,7 @@ osThreadId voltageMonitorHandle;
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void const * argument);
-void StartSensorTask(void const * argument);
-void StartNTCTask(void const * argument);
+void StartSensors_and_compute(void const * argument);
 void StartVoltageMonitorTask(void const * argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
@@ -127,13 +125,9 @@ void MX_FREERTOS_Init(void) {
   osThreadDef(defaultTask, StartDefaultTask, osPriorityRealtime, 0, 256);
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
   
-  /* definition and creation of sensorTask - 延时启动 */
-  osThreadDef(sensorTask, StartSensorTask, osPriorityNormal, 0, 512);
-  sensorTaskHandle = osThreadCreate(osThread(sensorTask), NULL);
-  
-  /* definition and creation of ntcTask - 延时启动 */
-  osThreadDef(ntcTask, StartNTCTask, osPriorityNormal, 0, 256);
-  ntcTaskHandle = osThreadCreate(osThread(ntcTask), NULL);
+  /* definition and creation of Sensors_and_compute - 传感器与计算任务 */
+  osThreadDef(Sensors_and_compute, StartSensors_and_compute, osPriorityNormal, 0, 512);
+  Sensors_and_computeHandle = osThreadCreate(osThread(Sensors_and_compute), NULL);
   
   /* definition and creation of voltageMonitorTask - 最低优先级 */
   osThreadDef(voltageMonitor, StartVoltageMonitorTask, osPriorityLow, 0, 256);
@@ -162,7 +156,8 @@ void StartDefaultTask(void const * argument)
   // send_message("\n========================================\n");
   // send_message("System Power-On Initialization\n");
   // send_message("========================================\n");
-  
+  NMOS1_OFF();
+  NMOS2_OFF();
   // 延时等待系统稳定，使用阻塞式延时确保其他任务未启动
   Delay_Blocking_ms(500);
   // ========== 上电电压检测 ==========
@@ -209,29 +204,35 @@ void StartDefaultTask(void const * argument)
 /* USER CODE BEGIN Application */
 
 /**
-  * @brief  Function implementing the sensorTask thread.
+  * @brief  Function implementing the Sensors_and_compute thread.
   * @param  argument: Not used
   * @retval None
+  * 
+  * 功能：传感器读取与计算任务，包含：
+  * - WF5803F 温度和气压检测
+  * - NTC 温度检测
+  * - 后续可添加其他传感器和计算逻辑
   */
-void StartSensorTask(void const * argument)
+void StartSensors_and_compute(void const * argument)
 {
   float temperature;
   float pressure;
+  float Temp_NTC;
+  uint32_t adcValue;
   HAL_StatusTypeDef status;
 
-  // send_message("SensorTask Started!\n");
+  send_message("=== Sensors_and_compute Task Started! ===\n");
   
   /* Infinite loop */
   for(;;)
   {
     // 检查低压标志，如果电压过低则挂起任务
     if (g_lowVoltageFlag) {
-      send_message("Sensor task suspended due to low voltage!\n");
+      send_message("Sensors_and_compute task suspended due to low voltage!\n");
       vTaskSuspend(NULL);  // 挂起自己
     }
     
-    // send_message("Reading sensor...\n");
-    
+    // ========== WF5803F 温度和气压检测 ==========
     // 测试 I2C 通信
     uint8_t test_cmd = 0x0A;
     status = HAL_I2C_Mem_Write(&hi2c1, WF5803F_ADDR, WF5803F_REG_CTRL, I2C_MEMADD_SIZE_8BIT, &test_cmd, 1, 100);
@@ -245,45 +246,25 @@ void StartSensorTask(void const * argument)
     // 获取温度和气压数据
     WF5803F_GetData(&temperature, &pressure);
     
-    // 通过串口1发送数据
-    send_message("WF5803-Temp: %.2f C, Press: %.2f kPa\n", temperature, pressure);
     
-    // 延时1秒
-    osDelay(1000);
-  }
-}
-
-/**
-  * @brief  Function implementing the ntcTask thread.
-  * @param  argument: Not used
-  * @retval None
-  */
-void StartNTCTask(void const * argument)
-{
-  float Temp_NTC;
-  uint32_t adcValue;
-
-  
-  send_message("=== NTC Task Started! ===\n");
-  
-  /* Infinite loop */
-  for(;;)
-  {
-    // 检查低压标志，如果电压过低则挂起任务
-    if (g_lowVoltageFlag) {
-      send_message("NTC task suspended due to low voltage!\n");
-      vTaskSuspend(NULL);  // 挂起自己
-    }
     
+    // ========== NTC 温度检测 ==========
     // 读取 ADC 值
     adcValue = Read_ADC0();
     
     // 计算温度
     Temp_NTC = compute_ntc_temperature(adcValue);
-    
+
+
+    // 通过串口1发送数据
+    send_message("WF5803-Temp: %.2f C, Press: %.2f kPa\n", temperature, pressure);
     // 通过串口1发送结果
     send_message("NTC-Temp: %.2fC\n", Temp_NTC);
     
+
+    // ========== 后续可在此处添加其他传感器读取和计算逻辑 ==========
+    //PID控制量计算
+
     // 延时1秒
     osDelay(1000);
   }
@@ -329,12 +310,9 @@ void StartVoltageMonitorTask(void const * argument)
         send_message("!!! LOW VOLTAGE ALERT !!!\n");
         send_message("Suspending All tasks...\n");
         
-        // 挂起其他任务
-        if (sensorTaskHandle != NULL) {
-          vTaskSuspend(sensorTaskHandle);
-        }
-        if (ntcTaskHandle != NULL) {
-          vTaskSuspend(ntcTaskHandle);
+        // 挂起传感器计算任务
+        if (Sensors_and_computeHandle != NULL) {
+          vTaskSuspend(Sensors_and_computeHandle);
         }
       }
       

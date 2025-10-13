@@ -23,8 +23,7 @@
 #include "i2c.h"
 #include "usart.h"
 #include "gpio.h"
-#define NMOS1_ON()              HAL_GPIO_WritePin(NMOS1_G_GPIO_Port, NMOS1_G_Pin, GPIO_PIN_RESET)
-#define NMOS1_OFF()             HAL_GPIO_WritePin(NMOS1_G_GPIO_Port, NMOS1_G_Pin, GPIO_PIN_SET)
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 

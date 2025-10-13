@@ -85,24 +85,20 @@ typedef struct {
 
 /* PID控制器配置 */
 #define PID_SAMPLE_TIME_MS      100     // PID采样周期 (ms)
-#define PID_OUTPUT_MAX          100.0f  // PID输出上限 (%)
-#define PID_OUTPUT_MIN          0.0f    // PID输出下限 (%)
+#define PID_OUTPUT_MAX          1000.0f // PID输出上限 (1000ms = 全功率)
+#define PID_OUTPUT_MIN          0.0f    // PID输出下限 (0ms = 关闭)
 #define PID_INTEGRAL_MAX        500.0f  // 积分限幅最大值
 #define PID_INTEGRAL_MIN        -500.0f // 积分限幅最小值
 
-/* PWM配置 */
-#define PWM_FREQUENCY           1000    // PWM频率 (Hz)
-#define PWM_PERIOD              1000    // PWM周期 (对应1000Hz)
-#define PWM_MIN_DUTY            0       // 最小占空比 (0%)
-#define PWM_MAX_DUTY            1000    // 最大占空比 (100%)
+/* PWM配置 - 基于1000ms周期 */
+#define PWM_PERIOD_MS           1000    // PWM周期 (1000ms = 1秒)
+#define PWM_MIN_DUTY_MS         0       // 最小占空比 (0ms)
+#define PWM_MAX_DUTY_MS         1000    // 最大占空比 (1000ms)
 
 /* 温度控制配置 */
 #define TEMP_DEADBAND           0.5f    // 温度死区 (°C)，在目标温度±死区内不调整
 #define TEMP_EMERGENCY_MAX      80.0f   // 紧急最高温度限制 (°C)
 #define TEMP_SAFE_SHUTDOWN      75.0f   // 安全关机温度 (°C)
-
-/* 安全保护配置 */
-#define SAFETY_DELAY_SECONDS    5       // 上电后安全延迟时间 (秒)，此期间加热关闭
 
 /* NMOS控制引脚配置 */
 #define NMOS1_ON()              HAL_GPIO_WritePin(NMOS1_G_GPIO_Port, NMOS1_G_Pin, GPIO_PIN_RESET)
@@ -125,7 +121,7 @@ void PID_Init(PID_Controller_t *pid);
  * @brief  PID控制器计算
  * @param  pid: PID控制器结构体指针
  * @param  measured_value: 当前测量的温度值
- * @retval PID输出值 (0-100)
+ * @retval PID输出值 (0-1000ms)
  */
 float PID_Compute(PID_Controller_t *pid, float measured_value);
 
@@ -145,29 +141,12 @@ void PID_SetSetpoint(PID_Controller_t *pid, float setpoint);
 void PID_Reset(PID_Controller_t *pid);
 
 /**
- * @brief  设置PID参数
- * @param  pid: PID控制器结构体指针
- * @param  kp: 比例增益
- * @param  ki: 积分增益
- * @param  kd: 微分增益
+ * @brief  控制MOS管占空比（软件PWM）
+ * @param  duty_ms: 1000ms周期内的导通毫秒数 (0-1000ms)
  * @retval None
+ * @note   在FreeRTOS任务中以约1ms间隔周期调用此函数
  */
-void PID_SetTunings(PID_Controller_t *pid, float kp, float ki, float kd);
-
-/**
- * @brief  根据PID输出控制NMOS占空比
- * @param  duty: 占空比 (0-100)
- * @retval None
- */
-void TempCtrl_SetDuty(float duty);
-
-/**
- * @brief  温度控制任务 (在FreeRTOS任务中周期调用)
- * @param  current_temp: 当前温度值
- * @retval None
- * @note   包含上电5秒安全延迟保护，期间加热保持关闭状态
- */
-void TempCtrl_Task(float current_temp);
+void MOS_Control(uint16_t duty_ms);
 
 /**
  * @brief  紧急关闭加热
@@ -178,18 +157,11 @@ void TempCtrl_EmergencyStop(void);
 /**
  * @brief  初始化温度控制系统
  * @retval None
- * @note   初始化后会启动5秒安全延迟，期间所有加热输出强制为0
  */
 void TempCtrl_Init(void);
 
 /**
- * @brief  获取当前PID输出值
- * @retval PID输出值 (0-100)
- */
-float TempCtrl_GetOutput(void);
-
-/**
- * @brief  获取PID控制器指针
+ * @brief  获取PID控制器指针（用于外部调整PID参数）
  * @retval PID控制器结构体指针
  */
 PID_Controller_t* TempCtrl_GetPID(void);

@@ -34,17 +34,12 @@
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
-static PID_Controller_t g_pid;           // 全局PID控制器
-static volatile float g_current_duty = 0.0f;  // 当前占空比
-static volatile uint8_t g_heating_enabled = 1;  // 加热使能标志
-static volatile uint32_t g_init_timestamp = 0;  // 初始化时间戳
-static volatile uint8_t g_safety_delay_active = 1;  // 安全延迟标志
-
-/* Private define for safety delay */
-#define SAFETY_DELAY_MS    5000  // 上电后5秒安全延迟
+static PID_Controller_t g_pid;                    // 全局PID控制器
+static volatile uint16_t g_current_duty_ms = 0;   // 当前占空比(毫秒数)
+static volatile uint8_t g_heating_enabled = 1;    // 加热使能标志
+static volatile uint32_t g_pwm_counter = 0;       // PWM计数器
 
 /* Private function prototypes -----------------------------------------------*/
-static void PWM_SetDuty(float duty);
 static float Clamp(float value, float min, float max);
 
 /* Function implementations --------------------------------------------------*/
@@ -87,7 +82,7 @@ void PID_Init(PID_Controller_t *pid)
  * @brief  PID控制器计算
  * @param  pid: PID控制器结构体指针
  * @param  measured_value: 当前测量的温度值
- * @retval PID输出值 (0-100)
+ * @retval PID输出值 (0-1000ms)
  */
 float PID_Compute(PID_Controller_t *pid, float measured_value)
 {
@@ -117,7 +112,7 @@ float PID_Compute(PID_Controller_t *pid, float measured_value)
                   pid->Ki * pid->integral + 
                   pid->Kd * derivative;
     
-    // 输出限幅
+    // 输出限幅 (0-1000ms)
     pid->output = Clamp(pid->output, pid->output_limit_min, pid->output_limit_max);
     
     // 保存当前误差供下次使用
@@ -153,23 +148,6 @@ void PID_Reset(PID_Controller_t *pid)
 }
 
 /**
- * @brief  设置PID参数
- * @param  pid: PID控制器结构体指针
- * @param  kp: 比例增益
- * @param  ki: 积分增益
- * @param  kd: 微分增益
- * @retval None
- */
-void PID_SetTunings(PID_Controller_t *pid, float kp, float ki, float kd)
-{
-    if (pid == NULL) return;
-    
-    pid->Kp = kp;
-    pid->Ki = ki;
-    pid->Kd = kd;
-}
-
-/**
  * @brief  限幅函数
  * @param  value: 输入值
  * @param  min: 最小值
@@ -184,86 +162,21 @@ static float Clamp(float value, float min, float max)
 }
 
 /**
- * @brief  软件PWM设置占空比
- * @param  duty: 占空比 (0-100)
+ * @brief  控制MOS管占空比（软件PWM）
+ * @param  duty_ms: 1000ms周期内的导通毫秒数 (0-1000ms)
  * @retval None
- * @note   此函数控制NMOS1和NMOS2，使用相同的占空比
- *         可根据需要修改为独立控制两路NMOS
+ * @note   此函数应在FreeRTOS任务中以约1ms间隔周期调用
+ *         实现基于1000ms周期的软件PWM控制
  */
-static void PWM_SetDuty(float duty)
+void MOS_Control(uint16_t duty_ms)
 {
-    // 限制占空比范围
-    duty = Clamp(duty, 0.0f, 100.0f);
-    g_current_duty = duty;
-    
-    // 注意: NMOS低电平导通，高电平关断
-    // duty = 0%  表示完全关断 (GPIO输出高电平)
-    // duty = 100% 表示完全导通 (GPIO输出低电平)
-    
-    // 这里使用简单的软件PWM实现
-    // 实际应用中建议使用硬件定时器PWM以获得更精确的控制
-    
-    // 如果占空比为0，直接关断
-    if (duty < 0.1f) {
-        NMOS1_OFF();
-        NMOS2_OFF();
-        return;
+    // 限制占空比范围 (0-1000ms)
+    if (duty_ms > PWM_MAX_DUTY_MS) {
+        duty_ms = PWM_MAX_DUTY_MS;
     }
     
-    // 如果占空比为100%，直接导通
-    if (duty > 99.9f) {
-        NMOS1_ON();
-        NMOS2_ON();
-        return;
-    }
-    
-    // 中间值使用软件PWM (需要在任务中周期调用)
-    // 这里仅设置占空比值，实际PWM逻辑在TempCtrl_Task中实现
-}
-
-/**
- * @brief  根据PID输出控制NMOS占空比
- * @param  duty: 占空比 (0-100)
- * @retval None
- */
-void TempCtrl_SetDuty(float duty)
-{
-    PWM_SetDuty(duty);
-}
-
-/**
- * @brief  温度控制任务 (在FreeRTOS任务中周期调用)
- * @param  current_temp: 当前温度值
- * @retval None
- */
-void TempCtrl_Task(float current_temp)
-{
-    static uint32_t pwm_counter = 0;
-    static uint8_t safety_msg_sent = 0;  // 安全延迟消息标志
-    
-    // ========== 安全延迟检查 (上电后5秒) ==========
-    if (g_safety_delay_active) {
-        uint32_t elapsed = HAL_GetTick() - g_init_timestamp;
-        
-        if (elapsed < SAFETY_DELAY_MS) {
-            // 安全延迟期间，强制关闭加热
-            NMOS1_OFF();
-            NMOS2_OFF();
-            g_current_duty = 0.0f;
-            
-            // 只发送一次安全延迟消息
-            if (!safety_msg_sent) {
-                send_message("[TEMP_CTRL] Safety delay active: heating disabled for %d seconds\n", 
-                           SAFETY_DELAY_MS / 1000);
-                safety_msg_sent = 1;
-            }
-            return;
-        } else {
-            // 安全延迟结束
-            g_safety_delay_active = 0;
-            send_message("[TEMP_CTRL] Safety delay ended, PID control starting...\n");
-        }
-    }
+    // 保存当前占空比
+    g_current_duty_ms = duty_ms;
     
     // 检查是否使能加热
     if (!g_heating_enabled) {
@@ -272,37 +185,15 @@ void TempCtrl_Task(float current_temp)
         return;
     }
     
-    // 紧急温度保护
-    if (current_temp >= TEMP_EMERGENCY_MAX) {
-        send_message("[TEMP_CTRL] EMERGENCY! Temperature %.2f°C >= %.2f°C\n", 
-               current_temp, TEMP_EMERGENCY_MAX);
-        TempCtrl_EmergencyStop();
-        return;
-    }
-    
-    // 安全温度保护
-    if (current_temp >= TEMP_SAFE_SHUTDOWN) {
-        send_message("[TEMP_CTRL] WARNING! Temperature %.2f°C >= %.2f°C, reducing power\n", 
-               current_temp, TEMP_SAFE_SHUTDOWN);
-        // 强制降低输出到30%
-        PWM_SetDuty(30.0f);
-    } else {
-        // PID控制
-        float pid_output = PID_Compute(&g_pid, current_temp);
-        PWM_SetDuty(pid_output);
-    }
-    
-    // 软件PWM实现 (基于100个计数周期)
-    // PWM频率 = 1000Hz / 100 = 10Hz
-    pwm_counter++;
-    if (pwm_counter >= 100) {
-        pwm_counter = 0;
+    // PWM计数器递增
+    g_pwm_counter++;
+    if (g_pwm_counter >= PWM_PERIOD_MS) {
+        g_pwm_counter = 0;
     }
     
     // 根据占空比控制NMOS
-    uint32_t on_time = (uint32_t)(g_current_duty);  // 0-100
-    
-    if (pwm_counter < on_time) {
+    // 注意: NMOS低电平导通，高电平关断
+    if (g_pwm_counter < duty_ms) {
         // PWM高电平期间 - NMOS导通
         NMOS1_ON();
         NMOS2_ON();
@@ -323,7 +214,8 @@ void TempCtrl_EmergencyStop(void)
     NMOS1_OFF();
     NMOS2_OFF();
     PID_Reset(&g_pid);
-    g_current_duty = 0.0f;
+    g_current_duty_ms = 0;
+    g_pwm_counter = 0;
     
     send_message("[TEMP_CTRL] Emergency stop activated!\n");
 }
@@ -341,20 +233,16 @@ void TempCtrl_Init(void)
     NMOS1_OFF();
     NMOS2_OFF();
     
-    // 记录初始化时间戳（用于安全延迟）
-    g_init_timestamp = HAL_GetTick();
-    g_safety_delay_active = 1;
-    
     // 使能加热
     g_heating_enabled = 1;
-    g_current_duty = 0.0f;
+    g_current_duty_ms = 0;
+    g_pwm_counter = 0;
     
     send_message("[TEMP_CTRL] Temperature Control Initialized\n");
     send_message("[TEMP_CTRL] Target Temperature: %.2f°C\n", TARGET_TEMPERATURE);
     send_message("[TEMP_CTRL] PID Parameters: Kp=%.2f, Ki=%.2f, Kd=%.2f\n", 
            g_pid.Kp, g_pid.Ki, g_pid.Kd);
-    send_message("[TEMP_CTRL] Safety delay: %d seconds before heating starts\n", 
-           SAFETY_DELAY_MS / 1000);
+    send_message("[TEMP_CTRL] PWM Period: %dms\n", PWM_PERIOD_MS);
     
     // 打印温度区间信息
     #if (TARGET_TEMP_INT < 50)
@@ -367,16 +255,7 @@ void TempCtrl_Init(void)
 }
 
 /**
- * @brief  获取当前PID输出值
- * @retval PID输出值 (0-100)
- */
-float TempCtrl_GetOutput(void)
-{
-    return g_pid.output;
-}
-
-/**
- * @brief  获取PID控制器指针
+ * @brief  获取PID控制器指针（用于外部调整PID参数）
  * @retval PID控制器结构体指针
  */
 PID_Controller_t* TempCtrl_GetPID(void)
