@@ -51,9 +51,10 @@ static float Clamp(float value, float min, float max);
 void Set_Heating_PWM(uint16_t duty_ms)
 {
     if (duty_ms > 1000) duty_ms = 1000;
+    if(duty_ms < 0) duty_ms = 0;
     uint32_t pulse = duty_ms * 10; // 1000ms对应10000计数
     __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, pulse); // PC6
-    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, pulse); // PC7
+    // __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, pulse); // PC7
 }
 
 /**
