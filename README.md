@@ -69,6 +69,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 ```
 
 **任务实现**:
+
 ```c
 // freertos.c - USART 接收任务
 void StartReceiveAndTargetChangeTask(void const * argument)

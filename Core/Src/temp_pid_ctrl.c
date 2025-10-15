@@ -22,13 +22,12 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "temp_pid_ctrl.h"
+#include "main.h"  // 包含 main.h 以使用 htim3 的声明
 #include "cmsis_os.h"
 #include "usart.h"
 #include <math.h>
 #include <stdio.h>
 #include "stm32f4xx_hal_tim.h"
-
-extern TIM_HandleTypeDef htim3; // TIM3句柄
 
 /* Private typedef -----------------------------------------------------------*/
 
@@ -37,7 +36,6 @@ extern TIM_HandleTypeDef htim3; // TIM3句柄
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
-static PID_Controller_t g_pid;                    // 全局PID控制器
 
 /* Private function prototypes -----------------------------------------------*/
 static float Clamp(float value, float min, float max);
@@ -72,7 +70,7 @@ void PID_Init(PID_Controller_t *pid)
     pid->Kd = PID_KD;
     
     // 设置目标温度
-    pid->setpoint = TARGET_TEMPERATURE;
+    pid->setpoint = TARGET_TEMP_1;
     
     // 初始化内部状态
     pid->integral = 0.0f;
@@ -178,13 +176,13 @@ static float Clamp(float value, float min, float max)
  * @brief  紧急关闭加热
  * @retval None
  */
-void TempCtrl_EmergencyStop(void)
+void TempCtrl_EmergencyStop(PID_Controller_t *pid)
 {
     // 关闭硬件PWM输出
     Set_Heating_PWM(0);
     
     // 重置PID控制器
-    PID_Reset(&g_pid);
+    PID_Reset(pid);
     
     send_message("[TEMP_CTRL] Emergency stop activated!\n");
 }
@@ -193,35 +191,36 @@ void TempCtrl_EmergencyStop(void)
  * @brief  初始化温度控制系统
  * @retval None
  */
-void TempCtrl_Init(void)
+void TempCtrl_Init(PID_Controller_t *pid)
 {
     // 初始化PID控制器
-    PID_Init(&g_pid);
+    PID_Init(pid);
     
     // 初始化硬件PWM为关断状态
     Set_Heating_PWM(0);
     
     send_message("[TEMP_CTRL] Temperature Control Initialized\n");
-    send_message("[TEMP_CTRL] Target Temperature: %.2f°C\n", TARGET_TEMPERATURE);
+    send_message("[TEMP_CTRL] Target Temperature: %.2f°C\n", TARGET_TEMP_1);
     send_message("[TEMP_CTRL] PID Parameters: Kp=%.2f, Ki=%.2f, Kd=%.2f\n", 
-           g_pid.Kp, g_pid.Ki, g_pid.Kd);
+           pid->Kp, pid->Ki, pid->Kd);
     send_message("[TEMP_CTRL] Hardware PWM Mode (TIM3), Period: %dms\n", PWM_PERIOD_MS);
     
     // 打印温度区间信息
-    #if (TARGET_TEMP_INT < 50)
-    send_message("[TEMP_CTRL] Temperature Range: LOW (30-50°C)\n");
-    #elif (TARGET_TEMP_INT < 70)
-    send_message("[TEMP_CTRL] Temperature Range: MID (50-70°C)\n");
-    #else
-    send_message("[TEMP_CTRL] Temperature Range: HIGH (70-100°C)\n");
-    #endif
+    // #if (TARGET_TEMP_INT < 50)
+    // send_message("[TEMP_CTRL] Temperature Range: LOW (30-50°C)\n");
+    // #elif (TARGET_TEMP_INT < 70)
+    // send_message("[TEMP_CTRL] Temperature Range: MID (50-70°C)\n");
+    // #else
+    // send_message("[TEMP_CTRL] Temperature Range: HIGH (70-100°C)\n");
+    // #endif
 }
 
-/**
- * @brief  获取PID控制器指针（用于外部调整PID参数）
- * @retval PID控制器结构体指针
- */
-PID_Controller_t* TempCtrl_GetPID(void)
-{
-    return &g_pid;
-}
+// /**
+//  * @brief  获取PID控制器指针（用于外部调整PID参数）
+//  * @retval PID控制器结构体指针
+//  */
+// PID_Controller_t* TempCtrl_GetPID(void)
+// {
+//     return &g_pid;
+// }
+// ❌ 静态变量才需要返回指针，全局变量直接extern即可

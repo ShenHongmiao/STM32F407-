@@ -49,39 +49,30 @@ typedef struct {
 /* Exported constants --------------------------------------------------------*/
 
 /* 目标温度配置 - 可通过此宏修改控制温度 */
-#define TARGET_TEMPERATURE      50.0f   // 目标温度 (°C)
-#define TARGET_TEMP_INT         50      // 目标温度整数值 (用于条件编译)
-
+#define TARGET_TEMP_1     30.0f    
+#define TARGET_TEMP_2     50.0f
 /* PID参数配置 - 根据不同目标温度可能需要调整 */
 /* 低温区域 (30-50°C) 推荐参数 */
-#define PID_KP_LOW              8.0f    // 比例增益
-#define PID_KI_LOW              0.5f    // 积分增益
-#define PID_KD_LOW              2.0f    // 微分增益
+#define PID_KP             8.0f    // 比例增益
+#define PID_KI             0.5f    // 积分增益
+#define PID_KD             2.0f    // 微分增益
 
-/* 中温区域 (50-70°C) 推荐参数 */
-#define PID_KP_MID              6.0f    // 比例增益
-#define PID_KI_MID              0.3f    // 积分增益
-#define PID_KD_MID              1.5f    // 微分增益
 
-/* 高温区域 (70-100°C) 推荐参数 */
-#define PID_KP_HIGH             4.0f    // 比例增益
-#define PID_KI_HIGH             0.2f    // 积分增益
-#define PID_KD_HIGH             1.0f    // 微分增益
 
-/* 根据目标温度自动选择PID参数 */
-#if (TARGET_TEMP_INT < 50)
-    #define PID_KP              PID_KP_LOW
-    #define PID_KI              PID_KI_LOW
-    #define PID_KD              PID_KD_LOW
-#elif (TARGET_TEMP_INT < 70)
-    #define PID_KP              PID_KP_MID
-    #define PID_KI              PID_KI_MID
-    #define PID_KD              PID_KD_MID
-#else
-    #define PID_KP              PID_KP_HIGH
-    #define PID_KI              PID_KI_HIGH
-    #define PID_KD              PID_KD_HIGH
-#endif
+// /* 根据目标温度自动选择PID参数 */
+// #if (TARGET_TEMP_INT < 50)
+//     #define PID_KP              PID_KP_LOW
+//     #define PID_KI              PID_KI_LOW
+//     #define PID_KD              PID_KD_LOW
+// #elif (TARGET_TEMP_INT < 70)
+//     #define PID_KP              PID_KP_MID
+//     #define PID_KI              PID_KI_MID
+//     #define PID_KD              PID_KD_MID
+// #else
+//     #define PID_KP              PID_KP_HIGH
+//     #define PID_KI              PID_KI_HIGH
+//     #define PID_KD              PID_KD_HIGH
+// #endif
 
 /* PID控制器配置 */
 #define PID_SAMPLE_TIME_MS      100     // PID采样周期 (ms)
@@ -146,19 +137,19 @@ void Set_Heating_PWM(uint16_t duty_ms);
  * @brief  紧急关闭加热
  * @retval None
  */
-void TempCtrl_EmergencyStop(void);
+void TempCtrl_EmergencyStop(PID_Controller_t *pid);
 
 /**
  * @brief  初始化温度控制系统
  * @retval None
  */
-void TempCtrl_Init(void);
+void TempCtrl_Init(PID_Controller_t *pid);
 
 /**
  * @brief  获取PID控制器指针（用于外部调整PID参数）
  * @retval PID控制器结构体指针
  */
-PID_Controller_t* TempCtrl_GetPID(void);
+// PID_Controller_t* TempCtrl_GetPID(void);//静态变量才需要返回指针，全局变量直接extern即可
 
 #ifdef __cplusplus
 }

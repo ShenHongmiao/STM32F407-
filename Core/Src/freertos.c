@@ -126,13 +126,14 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   
-  /* definition and creation of receiveAndTargetChange - USART接收任务，最高优先级 */
-  osThreadDef(receiveAndTargetChange, StartReceiveAndTargetChangeTask, osPriorityRealtime, 0, 256);
-  receiveAndTargetChangeHandle = osThreadCreate(osThread(receiveAndTargetChange), NULL);
-  
-  /* definition and creation of defaultTask - 上电检测任务，高优先级 */
-  osThreadDef(defaultTask, StartDefaultTask, osPriorityHigh, 0, 256);
+
+  /* definition and creation of defaultTask - 上电检测任务，最高优先级 */
+  osThreadDef(defaultTask, StartDefaultTask, osPriorityRealtime, 0, 256);
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
+
+  /* definition and creation of receiveAndTargetChange - USART接收任务，高优先级 */
+  osThreadDef(receiveAndTargetChange, StartReceiveAndTargetChangeTask, osPriorityHigh, 0, 256);
+  receiveAndTargetChangeHandle = osThreadCreate(osThread(receiveAndTargetChange), NULL);
   
   /* definition and creation of Sensors_and_compute - 传感器与计算任务 */
   osThreadDef(Sensors_and_compute, StartSensors_and_compute, osPriorityNormal, 0, 512);
@@ -170,21 +171,14 @@ void StartDefaultTask(void const * argument)
   // 延时等待系统稳定，使用阻塞式延时确保其他任务未启动
   Delay_Blocking_ms(500);
   // ========== 上电电压检测 ==========
-  // send_message("\n[BOOT] Power-on voltage check...\n");
   voltageStatus = Check_Voltage(&voltage);
-  
-  // send_message("Voltage: %.2fV, Status: %s\n", voltage, voltageStatus ? "OK" : "LOW");
-  // send_message("Threshold: %.2fV (70%% of %.1fV)\n", VOLTAGE_THRESHOLD, VOLTAGE_NORMAL);
   
   if (!voltageStatus) {
     // 电压过低，设置标志并挂起其他任务
     // g_lowVoltageFlag = 1;
-    
+
     // 发送低压警告
     Send_VoltageWarning(voltage, "LOW");
-    // send_message("\n!!! LOW VOLTAGE ALERT !!!\n");
-    // send_message("System will run in low-power mode.\n");
-    // send_message("Sensor and NTC tasks will be suspended.\n");
     
     // 挂起其他任务（稍后创建时会被挂起）
     // 注意：此时其他任务可能还未创建，所以在各任务启动时检查标志
@@ -192,14 +186,8 @@ void StartDefaultTask(void const * argument)
   } else {
     // 电压正常
     Send_VoltageWarning(voltage, "OK");
-    // send_message("Voltage OK. All tasks will run normally.\n");
   }
-  
-  // send_message("\n========================================\n");
-  // send_message("Initialization complete.\n");
-  // send_message("Deleting default task...\n");
-  // send_message("========================================\n\n");
-  
+
   // 延时一下，确保消息打印完成
   Delay_Blocking_ms(100);
   
@@ -295,7 +283,7 @@ void StartVoltageMonitorTask(void const * argument)
   
   send_message("=== Voltage Monitor Task Started (Priority: Low) ===\n");
   send_message("Check interval: %d ms (%.1f minutes)\n", VOLTAGE_CHECK_INTERVAL, VOLTAGE_CHECK_INTERVAL/60000.0f);
-  
+  send_message("========================================\n\n\n");
   
   // ========== 进入周期检测循环 ==========
   for(;;)
@@ -356,8 +344,7 @@ void StartReceiveAndTargetChangeTask(void const * argument)
   uint8_t received_byte;
   
   send_message("=== USART Receive Task Started (Priority: Realtime) ===\n");
-  send_message("Waiting for USART2 data...\n");
-  
+ 
   /* Infinite loop */
   for(;;)
   {
@@ -371,7 +358,6 @@ void StartReceiveAndTargetChangeTask(void const * argument)
       // 发送接收到的数据信息
       send_message("Received byte from USART2: '%c' (0x%02X)\n", 
                    received_byte, received_byte);
-      
       // ========== 在此处添加命令处理逻辑 ==========
       
     

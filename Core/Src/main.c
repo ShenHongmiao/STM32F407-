@@ -27,6 +27,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "stm32f4xx_hal_tim.h" 
+#include "temp_pid_ctrl.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -101,12 +102,14 @@ int main(void)
   MX_I2C2_Init();
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
-  MX_TIM3_Init(); // 初始化TIM3为PWM输出
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1); // 启动CH1 PWM
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2); // 启动CH2 PWM
+
   /* USER CODE BEGIN 2 */
-  // 启动USART2的中断接收，接收单个字节
-  HAL_UART_Receive_IT(&huart2, &rx_byte, 1);
+  // TempCtrl_Init(); // 初始化温度控制系统
+  MX_TIM3_Init(); // 初始化TIM3为PWM输出
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);       // 启动CH1 PWM
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);       // 启动CH2 PWM
+  HAL_UART_Receive_IT(&huart2, &rx_byte, 1); // 启动USART2的中断接收，接收单个字节
+
   /* USER CODE END 2 */
 
   /* Call init function for freertos objects (in cmsis_os2.c) */
