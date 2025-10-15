@@ -160,7 +160,7 @@ void MX_FREERTOS_Init(void) {
 void StartDefaultTask(void const * argument)
 {
   // /* USER CODE BEGIN StartDefaultTask */
-    osDelay(10000);
+  osDelay(10000);
   // 删除自己，释放资源
   vTaskDelete(NULL);
 
