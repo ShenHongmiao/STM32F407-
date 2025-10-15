@@ -1,6 +1,7 @@
 #include "main.h"
 #include "cmsis_os.h"
 #include "adc.h"
+#include <math.h>
 
 
 // NTC 热敏电阻参数
