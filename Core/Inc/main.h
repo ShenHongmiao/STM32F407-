@@ -31,7 +31,7 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "cmsis_os.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -53,7 +53,9 @@ extern "C" {
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-
+extern UART_HandleTypeDef huart2; // 声明USART2句柄
+extern uint8_t rx_byte;
+extern osMessageQId usart_rx_queueHandle;
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/

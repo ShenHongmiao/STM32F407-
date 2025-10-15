@@ -13,14 +13,84 @@
 
 ## 功能特性
 
-### 1. 气压温度传感器 (WF5803F)
+### 1. 上位机串口通信 (UART2)
+
+- **通信接口**: UART2 (PD5/PD6)
+- **波特率**: 115200
+- **接收方式**: 中断 + FreeRTOS 队列（队列大小 16 字节）
+- **任务优先级**: Realtime（最高优先级，确保实时响应）
+- **工作模式**: 阻塞等待接收，死等上位机命令
+- **数据输出**: 传感器数据和系统状态通过 UART2 发送到上位机
+
+**实现细节**:
+
+- USART2 中断接收每个字节后，通过 `osMessagePut()` 放入队列
+- `receiveAndTargetChange` 任务使用 `osMessageGet(osWaitForever)` 阻塞读取
+- 中断优先级设置为 6，满足 FreeRTOS API 调用要求 (≥ 5)
+- **接收回调函数在 `HAL_UART_RxCpltCallback()` 中实现**，请勿在其中放入过长代码
+
+**中断优先级配置**:
+
+```c
+// usart.c - USART2 中断配置
+HAL_NVIC_SetPriority(USART2_IRQn, 6, 0);  // 优先级 6 (≥ 5)
+HAL_NVIC_EnableIRQ(USART2_IRQn);
+```
+
+**队列创建**:
+
+```c
+// freertos.c - 队列初始化
+osMessageQDef(usart_rx_queue, 16, uint8_t);
+usart_rx_queueHandle = osMessageCreate(osMessageQ(usart_rx_queue), NULL);
+```
+
+**中断处理函数**:
+
+```c
+// stm32f4xx_it.c - USART2 中断服务函数
+void USART2_IRQHandler(void)
+{
+  HAL_UART_IRQHandler(&huart2);
+}
+```
+
+**接收回调**:
+
+```c
+// usart.c - 接收完成回调
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+  if (huart->Instance == USART2) {
+    osMessagePut(usart_rx_queueHandle, (uint32_t)rx_byte, 0);
+    HAL_UART_Receive_IT(&huart2, &rx_byte, 1);
+  }
+}
+```
+
+**任务实现**:
+```c
+// freertos.c - USART 接收任务
+void StartReceiveAndTargetChangeTask(void const * argument)
+{
+  for(;;) {
+    event = osMessageGet(usart_rx_queueHandle, osWaitForever);
+    if (event.status == osEventMessage) {
+      uint8_t received_byte = (uint8_t)event.value.v;
+      // 处理接收到的命令...
+    }
+  }
+}
+```
+
+### 2. 气压温度传感器 (WF5803F)
 
 - **通信接口**: I2C1 (PB8/PB9)
 - **测量范围**: 0-2 Bar (气压), -40°C ~ 125°C (温度)
 - **采样频率**: 1Hz
 - **数据输出**: 通过 UART 串口输出
 
-### 2. NTC 温度检测
+### 3. NTC 温度检测
 
 - **硬件接口**: ADC1_IN0 (PA0)
 - **传感器类型**: 10kΩ NTC 热敏电阻 (B=3380)
@@ -28,7 +98,7 @@
 - **采样频率**: 1Hz
 - **温度范围**: -40°C ~ 125°C
 
-### 3. 电源电压监控
+### 4. 电源电压监控
 
 - **检测引脚**: PC4 (V_DETECT)
 - **检测方式**: ADC采样
@@ -38,7 +108,7 @@
   - 低于 70% 阈值时挂起传感器任务并发送警告
 - **低压保护**: 自动挂起非关键任务以降低功耗
 
-### 4. 温度 PID 控制系统
+### 5. 温度 PID 控制系统
 
 - **控制算法**: 增量式 PID 控制器
 - **目标温度**: 可配置（默认 50°C）
@@ -51,7 +121,7 @@
   - 温度死区控制（±0.5°C）
 - **PID 参数**: 根据目标温度自动选择（低温/中温/高温区域）
 
-### 5. NMOS 控制输出
+### 6. NMOS 控制输出
 
 - **控制引脚**: PC6, PC7, PC8, PC9
 - **功能**: 4路 NMOS 驱动控制
@@ -91,10 +161,10 @@
 
 | 核心板引脚 | STM32引脚 | 功能 | 用途 |
 |-----------|----------|------|------|
-| 48 | PB6 | UART1_TX | 调试串口输出 |
-| 46 | PB7 | UART1_RX | 调试串口输入 |
-| 39 | PD5 | UART2_TX | 预留串口 |
-| 36 | PD6 | UART2_RX | 预留串口 |
+| 48 | PB6 | UART1_TX | 调试串口输出（保留） |
+| 46 | PB7 | UART1_RX | 调试串口输入（保留） |
+| 39 | PD5 | UART2_TX | 数据输出串口 |
+| 36 | PD6 | UART2_RX | 上位机命令接收串口 |
 
 ### PWM/GPIO 控制
 
@@ -119,9 +189,10 @@
 
 | 任务名称 | 优先级 | 栈大小 | 功能描述 |
 |---------|-------|--------|---------|
-| defaultTask | Realtime | 256 | 上电初始化，执行首次电压检测后自删除 |
-| sensorTask | Normal | 512 | WF5803F 传感器数据读取 (1Hz) |
-| ntcTask | Normal | 256 | NTC 温度采集 (1Hz) |
+
+| defaultTask | High | 256 | 上电初始化，执行首次电压检测后自删除 |
+| receiveAndTargetChange | Realtime | 256 | USART2 接收任务，阻塞等待上位机命令 |
+| Sensors_and_compute | Normal | 512 | WF5803F 传感器数据读取和 NTC 温度采集 (1Hz) |
 | voltageMonitorTask | Low | 256 | 电源电压监控 (每10分钟检测) |
 
 ### 任务执行流程
@@ -170,13 +241,26 @@ voltageMonitorTask (低优先级后台运行)
 - **采样时间**: 15 cycles
 - **触发方式**: 软件触发
 
-### UART1 配置
+### UART 配置
+
+#### UART1 (预留调试口)
 
 - **波特率**: 115200
 - **数据位**: 8
 - **停止位**: 1
 - **校验**: None
 - **流控**: None
+
+#### UART2 (上位机通信)
+
+- **波特率**: 115200
+- **数据位**: 8
+- **停止位**: 1
+- **校验**: None
+- **流控**: None
+- **中断优先级**: 6 (必须 ≥ configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY)
+- **接收模式**: 中断接收 + FreeRTOS 队列
+- **队列大小**: 16 字节
 
 ## 编译与烧录
 
@@ -244,17 +328,27 @@ voltageMonitorTask (低优先级后台运行)
 
 ### 串口输出示例
 
-**正常运行输出：**
+**正常运行输出（UART2）：**
 
 ```text
-System Init...
-[STARTUP] Voltage check on boot...
-Voltage: 24.10V
-System voltage normal. All tasks running.
----
-WF5803F Pressure: 101.25 kPa, Temperature: 25.3°C
-NTC Temperature: 24.8°C
----
+=== USART Receive Task Started (Priority: Realtime) ===
+Waiting for USART2 data...
+=== Sensors_and_compute Task Started! ===
+WF5803-Temp: 25.30 C, Press: 101.25 kPa
+NTC-Temp: 24.80C
+```
+
+**接收上位机命令示例：**
+
+```text
+Received byte from USART2: '5' (0x35)
+Command: Set heating to 50%
+
+Received byte from USART2: 'h' (0x68)
+Help: Send 0-9 to control heating power
+
+Received byte from USART2: 'X' (0x58)
+Unknown command: 'X'
 ```
 
 ### 低压警告输出

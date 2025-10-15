@@ -28,14 +28,21 @@ extern "C" {
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
-/* USER CODE BEGIN Includes */
 
+/* USER CODE BEGIN Includes */
+#include <stdarg.h>
+#include <stdio.h>
+#include <string.h>
+#include "cmsis_os.h"
 /* USER CODE END Includes */
 
 extern UART_HandleTypeDef huart1;
 
 extern UART_HandleTypeDef huart2;
 
+extern uint8_t rx_byte;
+
+extern osMessageQId usart_rx_queueHandle;  // USART接收队列句柄
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */
@@ -54,6 +61,8 @@ void MX_USART2_UART_Init(void);
  */
 void send_message(const char *format, ...);
 
+
+void receive_message(char *buffer, size_t buffer_size);
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus

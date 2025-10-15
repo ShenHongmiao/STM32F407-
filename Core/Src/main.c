@@ -23,11 +23,10 @@
 #include "i2c.h"
 #include "usart.h"
 #include "gpio.h"
-#include "stm32f4xx_hal_tim.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "stm32f4xx_hal_tim.h" 
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -50,6 +49,8 @@
 /* USER CODE BEGIN PV */
 
 TIM_HandleTypeDef htim3; // TIM3句柄
+
+
 
 /* USER CODE END PV */
 
@@ -104,7 +105,8 @@ int main(void)
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1); // 启动CH1 PWM
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2); // 启动CH2 PWM
   /* USER CODE BEGIN 2 */
-
+  // 启动USART2的中断接收，接收单个字节
+  HAL_UART_Receive_IT(&huart2, &rx_byte, 1);
   /* USER CODE END 2 */
 
   /* Call init function for freertos objects (in cmsis_os2.c) */

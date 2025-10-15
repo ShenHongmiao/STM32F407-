@@ -22,17 +22,17 @@
 #include "task.h"
 #include "main.h"
 #include "cmsis_os.h"
-#include "WF5803F.h"
-#include "NTC.h"
-#include "V_detect.h"
 #include "usart.h"
 #include "i2c.h"
 #include "adc.h"
 #include <string.h>
 #include <stdio.h>
-#include "temp_pid_ctrl.h"
+
 /* USER CODE BEGIN Includes */
-// 使用send_message替代printf，通过串口1发送调试信息
+#include "temp_pid_ctrl.h"
+#include "WF5803F.h"
+#include "NTC.h"
+#include "V_detect.h"
 /* USER CODE END Includes */
 
 /* Private includes ----------------------------------------------------------*/
@@ -62,6 +62,8 @@ volatile uint8_t g_lowVoltageFlag = 0;  // 低电压标志: 0=正常, 1=低压
 osThreadId defaultTaskHandle;
 osThreadId Sensors_and_computeHandle;
 osThreadId voltageMonitorHandle;
+osThreadId receiveAndTargetChangeHandle;
+osMessageQId usart_rx_queueHandle;
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -71,6 +73,7 @@ osThreadId voltageMonitorHandle;
 void StartDefaultTask(void const * argument);
 void StartSensors_and_compute(void const * argument);
 void StartVoltageMonitorTask(void const * argument);
+void StartReceiveAndTargetChangeTask(void const * argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -114,15 +117,21 @@ void MX_FREERTOS_Init(void) {
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
+  /* definition and creation of usart_rx_queue */
+  osMessageQDef(usart_rx_queue, 16, uint32_t);
+  usart_rx_queueHandle = osMessageCreate(osMessageQ(usart_rx_queue), NULL);
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   
-  /* definition and creation of defaultTask - 最高优先级，用于上电检测 */
-  /* 注意：使用 osPriorityRealtime 确保最先执行 */
-  osThreadDef(defaultTask, StartDefaultTask, osPriorityRealtime, 0, 256);
+  /* definition and creation of receiveAndTargetChange - USART接收任务，最高优先级 */
+  osThreadDef(receiveAndTargetChange, StartReceiveAndTargetChangeTask, osPriorityRealtime, 0, 256);
+  receiveAndTargetChangeHandle = osThreadCreate(osThread(receiveAndTargetChange), NULL);
+  
+  /* definition and creation of defaultTask - 上电检测任务，高优先级 */
+  osThreadDef(defaultTask, StartDefaultTask, osPriorityHigh, 0, 256);
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
   
   /* definition and creation of Sensors_and_compute - 传感器与计算任务 */
@@ -263,7 +272,6 @@ void StartSensors_and_compute(void const * argument)
     
 
     // ========== 后续可在此处添加其他传感器读取和计算逻辑 ==========
-    //PID控制量计算
 
     // 延时1秒
     osDelay(1000);
@@ -329,4 +337,48 @@ void StartVoltageMonitorTask(void const * argument)
   }
 }
 
+/**
+  * @brief  Function implementing the receiveAndTargetChange thread.
+  * @param  argument: Not used
+  * @retval None
+  * 
+  * 功能：USART 接收与目标处理任务（最高优先级）
+  * - 阻塞等待从 USART 接收队列读取数据
+  * - 收到数据后立即处理
+  * - 可用于接收命令、改变目标值等操作
+  * 
+  * 优先级：最高 (osPriorityRealtime)
+  * 特点：阻塞式读取，死等数据到来
+  */
+void StartReceiveAndTargetChangeTask(void const * argument)
+{
+  osEvent event;
+  uint8_t received_byte;
+  
+  send_message("=== USART Receive Task Started (Priority: Realtime) ===\n");
+  send_message("Waiting for USART2 data...\n");
+  
+  /* Infinite loop */
+  for(;;)
+  {
+    // 阻塞读取队列，永久等待直到有数据到来
+    event = osMessageGet(usart_rx_queueHandle, osWaitForever);
+    
+    if (event.status == osEventMessage) {
+      // 成功接收到数据
+      received_byte = (uint8_t)event.value.v;
+      
+      // 发送接收到的数据信息
+      send_message("Received byte from USART2: '%c' (0x%02X)\n", 
+                   received_byte, received_byte);
+      
+      // ========== 在此处添加命令处理逻辑 ==========
+      
+    
+    // 注意：不需要 osDelay，因为 osMessageGet 本身就是阻塞的
+    // 当没有数据时，任务会自动进入阻塞状态，让出 CPU
+    }
+  }
+
+}
 /* USER CODE END Application */
