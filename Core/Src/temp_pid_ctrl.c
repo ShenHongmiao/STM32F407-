@@ -22,12 +22,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "temp_pid_ctrl.h"
-#include "main.h"  // 包含 main.h 以使用 htim3 的声明
-#include "cmsis_os.h"
-#include "usart.h"
-#include <math.h>
-#include <stdio.h>
-#include "stm32f4xx_hal_tim.h"
+
 
 /* Private typedef -----------------------------------------------------------*/
 
@@ -200,7 +195,7 @@ void TempCtrl_Init(PID_Controller_t *pid)
     Set_Heating_PWM(0);
     
     send_message("[TEMP_CTRL] Temperature Control Initialized\n");
-    send_message("[TEMP_CTRL] Target Temperature: %.2f°C\n", TARGET_TEMP_1);
+    send_message("[TEMP_CTRL] Target Temperature: %.2f°C\n", pid->setpoint);
     send_message("[TEMP_CTRL] PID Parameters: Kp=%.2f, Ki=%.2f, Kd=%.2f\n", 
            pid->Kp, pid->Ki, pid->Kd);
     send_message("[TEMP_CTRL] Hardware PWM Mode (TIM3), Period: %dms\n", PWM_PERIOD_MS);

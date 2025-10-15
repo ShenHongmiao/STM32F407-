@@ -159,42 +159,12 @@ void MX_FREERTOS_Init(void) {
 /* USER CODE END Header_StartDefaultTask */
 void StartDefaultTask(void const * argument)
 {
-  /* USER CODE BEGIN StartDefaultTask */
-  float voltage;
-  uint8_t voltageStatus;
-  
-  // send_message("\n========================================\n");
-  // send_message("System Power-On Initialization\n");
-  // send_message("========================================\n");
-  Set_Heating_PWM(0); // 确保加热关闭
-  
-  // 延时等待系统稳定，使用阻塞式延时确保其他任务未启动
-  Delay_Blocking_ms(500);
-  // ========== 上电电压检测 ==========
-  voltageStatus = Check_Voltage(&voltage);
-  
-  if (!voltageStatus) {
-    // 电压过低，设置标志并挂起其他任务
-    // g_lowVoltageFlag = 1;
-
-    // 发送低压警告
-    Send_VoltageWarning(voltage, "LOW");
-    
-    // 挂起其他任务（稍后创建时会被挂起）
-    // 注意：此时其他任务可能还未创建，所以在各任务启动时检查标志
-    
-  } else {
-    // 电压正常
-    Send_VoltageWarning(voltage, "OK");
-  }
-
-  // 延时一下，确保消息打印完成
-  Delay_Blocking_ms(100);
-  
+  // /* USER CODE BEGIN StartDefaultTask */
+    osDelay(10000);
   // 删除自己，释放资源
   vTaskDelete(NULL);
-  
-  /* USER CODE END StartDefaultTask */
+
+  // /* USER CODE END StartDefaultTask */
 }
 
 /* Private application code --------------------------------------------------*/

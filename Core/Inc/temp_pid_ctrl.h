@@ -19,8 +19,14 @@ extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
-#include "main.h"
-#include "stm32f4xx_hal.h"
+#include "stm32f4xx_hal.h"  
+#include "cmsis_os.h"
+#include "usart.h"
+#include <math.h>
+#include <stdio.h>
+
+/* Exported variables --------------------------------------------------------*/
+extern TIM_HandleTypeDef htim3;  // TIM3定时器句柄，用于PWM控制
 
 /* Exported types ------------------------------------------------------------*/
 
