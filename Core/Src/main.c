@@ -117,8 +117,10 @@ int main(void)
 
   float voltage;
   uint8_t voltageStatus;
+  /*安全保护开始*/
   Set_Heating_PWM(0); // 确保加热关闭
-  
+  /*安全保护结束*/
+
   // ========== 上电电压检测 ==========
   voltageStatus = Check_Voltage(&voltage);
     
@@ -136,6 +138,7 @@ int main(void)
     // 电压正常
     Send_VoltageWarning(voltage, "OK");
   }
+  
   /* USER CODE END 2 */
 
   /* Call init function for freertos objects (in cmsis_os2.c) */
