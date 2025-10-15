@@ -63,7 +63,7 @@ TIM_HandleTypeDef htim3; // TIM3句柄
 void SystemClock_Config(void);
 void MX_FREERTOS_Init(void);
 void MX_TIM3_Init(void);
-
+void Detect_Power(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -115,30 +115,7 @@ int main(void)
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);       // 启动CH2 PWM
   HAL_UART_Receive_IT(&huart2, &rx_byte, 1); // 启动USART2的中断接收，接收单个字节
 
-  float voltage;
-  uint8_t voltageStatus;
-  /*安全保护开始*/
-  Set_Heating_PWM(0); // 确保加热关闭
-  /*安全保护结束*/
-
-  // ========== 上电电压检测 ==========
-  voltageStatus = Check_Voltage(&voltage);
-    
-  if (!voltageStatus) {
-    // 电压过低，设置标志并挂起其他任务
-    // g_lowVoltageFlag = 1;
-
-    // 发送低压警告
-    Send_VoltageWarning(voltage, "LOW");
-    
-    // 挂起其他任务（稍后创建时会被挂起）
-    // 注意：此时其他任务可能还未创建，所以在各任务启动时检查标志
-    
-  } else {
-    // 电压正常
-    Send_VoltageWarning(voltage, "OK");
-  }
-  
+  Detect_Power(); // 检测电源电压，必要时发送警告
   /* USER CODE END 2 */
 
   /* Call init function for freertos objects (in cmsis_os2.c) */
@@ -275,6 +252,35 @@ void Error_Handler(void)
   {
   }
   /* USER CODE END Error_Handler_Debug */
+}
+
+void Detect_Power(void)
+{
+  /* USER CODE BEGIN Detect_Power */
+  float voltage;
+  uint8_t voltageStatus;
+  /*安全保护开始*/
+  Set_Heating_PWM(0); // 确保加热关闭
+  /*安全保护结束*/
+
+  // ========== 上电电压检测 ==========
+  voltageStatus = Check_Voltage(&voltage);
+    
+  if (!voltageStatus) {
+    // 电压过低，设置标志并挂起其他任务
+    // g_lowVoltageFlag = 1;
+
+    // 发送低压警告
+    Send_VoltageWarning(voltage, "LOW");
+    
+    // 挂起其他任务（稍后创建时会被挂起）
+    // 注意：此时其他任务可能还未创建，所以在各任务启动时检查标志
+    
+  } else {
+    // 电压正常
+    Send_VoltageWarning(voltage, "OK");
+  }
+  /* USER CODE END Detect_Power */
 }
 #ifdef USE_FULL_ASSERT
 /**

@@ -19,7 +19,7 @@ extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
-#include "stm32f4xx_hal.h"  
+#include "main.h"  
 #include "cmsis_os.h"
 #include "usart.h"
 #include <math.h>

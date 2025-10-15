@@ -1,7 +1,7 @@
 #include "main.h"
 #include "cmsis_os.h"
 #include "adc.h"
-#include "math.h"
+
 
 // NTC 热敏电阻参数
 #define NTC_BETA 3380.0f      // NTC 热敏电阻的 Beta 常数 (B值 25°C/50°C)

@@ -1,7 +1,9 @@
 #include "i2c.h"
-#include "main.h"
-#include "freertos.h"
+#include "cmsis_os.h"
+#include "FreeRTOS.h"
 #include "math.h"
+
+
 
 // WF5803F 寄存器地址定义
 #define WF5803F_ADDR          (0x6C<<1)   // I2C 设备地址 (7位地址左移)
