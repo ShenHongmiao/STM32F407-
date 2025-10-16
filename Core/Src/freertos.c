@@ -236,7 +236,7 @@ void StartSensors_and_compute(void const * argument)
     // 通过串口1发送PID输出结果
     send_message("PID Output: %.2f\n", temp_pid_CN1.output);
     // 延时1秒
-    osDelay(1000);
+    osDelay(500);
   }
 }
 
@@ -339,17 +339,21 @@ void StartReceiveAndTargetChangeTask(void const * argument)
         if(temp_pid_CN1.setpoint != TARGET_TEMP_1){
           PID_SetSetpoint(&temp_pid_CN1, TARGET_TEMP_1);
           send_message("Target temperature set to %.2f°C\n", TARGET_TEMP_1);
-        } else {
+        } else{
           PID_SetSetpoint(&temp_pid_CN1, TARGET_TEMP_2);
           send_message("Target temperature already at %.2f°C\n", TARGET_TEMP_2);
+        }
+      } else if(received_byte  == '2'){
+        
+          temp_pid_CN1.Kp= temp_pid_CN1.Kp + 1.0f;
+          send_message("Kp value increased to %.2f\n", temp_pid_CN1.Kp);
         }
 
       }
     
     // 注意：不需要 osDelay，因为 osMessageGet 本身就是阻塞的
     // 当没有数据时，任务会自动进入阻塞状态，让出 CPU
-    }
   }
-
 }
+
 /* USER CODE END Application */
