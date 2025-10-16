@@ -26,7 +26,7 @@ extern "C" {
 #include <stdio.h>
 
 /* Exported variables --------------------------------------------------------*/
-extern TIM_HandleTypeDef htim3;  // TIM3定时器句柄，用于PWM控制
+// extern TIM_HandleTypeDef htim3;  // TIM3定时器句柄，用于PWM控制
 
 /* Exported types ------------------------------------------------------------*/
 

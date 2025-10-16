@@ -54,7 +54,7 @@
 /* USER CODE BEGIN PV */
 
 TIM_HandleTypeDef htim3; // TIM3句柄
-
+PID_Controller_t temp_pid_CN1; // CN1通道PID控制器
 
 
 /* USER CODE END PV */
@@ -116,6 +116,7 @@ int main(void)
   HAL_UART_Receive_IT(&huart2, &rx_byte, 1); // 启动USART2的中断接收，接收单个字节
 
   Detect_Power(); // 检测电源电压，必要时发送警告
+  TempCtrl_Init(&temp_pid_CN1); // 初始化温度控制系统，传入CN1通道PID控制器结构体指针
   /* USER CODE END 2 */
 
   /* Call init function for freertos objects (in cmsis_os2.c) */

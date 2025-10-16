@@ -58,6 +58,7 @@
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
 volatile uint8_t g_lowVoltageFlag = 0;  // 低电压标志: 0=正常, 1=低压
+extern PID_Controller_t temp_pid_CN1; // CN1通道PID控制器
 /* USER CODE END Variables */
 osThreadId defaultTaskHandle;
 osThreadId Sensors_and_computeHandle;
@@ -230,7 +231,10 @@ void StartSensors_and_compute(void const * argument)
     
 
     // ========== 后续可在此处添加其他传感器读取和计算逻辑 ==========
-
+    PID_Compute(&temp_pid_CN1, Temp_NTC);
+    Set_Heating_PWM((uint32_t)temp_pid_CN1.output);
+    // 通过串口1发送PID输出结果
+    send_message("PID Output: %.2f\n", temp_pid_CN1.output);
     // 延时1秒
     osDelay(1000);
   }
@@ -272,7 +276,7 @@ void StartVoltageMonitorTask(void const * argument)
       if (g_lowVoltageFlag == 0) {
         // 检测到低压，挂起其他任务
         g_lowVoltageFlag = 1;
-        
+        // TempCtrl_EmergencyStop(&temp_pid_CN1); // 紧急关闭加热
         send_message("!!! LOW VOLTAGE ALERT !!!\n");
         send_message("Suspending All tasks...\n");
         
@@ -294,6 +298,8 @@ void StartVoltageMonitorTask(void const * argument)
     }
   }
 }
+
+
 
 /**
   * @brief  Function implementing the receiveAndTargetChange thread.
@@ -329,7 +335,16 @@ void StartReceiveAndTargetChangeTask(void const * argument)
       send_message("Received byte from USART2: '%c' (0x%02X)\n", 
                    received_byte, received_byte);
       // ========== 在此处添加命令处理逻辑 ==========
-      
+      if(received_byte  == '1'){
+        if(temp_pid_CN1.setpoint != TARGET_TEMP_1){
+          PID_SetSetpoint(&temp_pid_CN1, TARGET_TEMP_1);
+          send_message("Target temperature set to %.2f°C\n", TARGET_TEMP_1);
+        } else {
+          PID_SetSetpoint(&temp_pid_CN1, TARGET_TEMP_2);
+          send_message("Target temperature already at %.2f°C\n", TARGET_TEMP_2);
+        }
+
+      }
     
     // 注意：不需要 osDelay，因为 osMessageGet 本身就是阻塞的
     // 当没有数据时，任务会自动进入阻塞状态，让出 CPU

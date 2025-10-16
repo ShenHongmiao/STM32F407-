@@ -194,12 +194,12 @@ void TempCtrl_Init(PID_Controller_t *pid)
     // 初始化硬件PWM为关断状态
     Set_Heating_PWM(0);
     
-    send_message("[TEMP_CTRL] Temperature Control Initialized\n");
-    send_message("[TEMP_CTRL] Target Temperature: %.2f°C\n", pid->setpoint);
-    send_message("[TEMP_CTRL] PID Parameters: Kp=%.2f, Ki=%.2f, Kd=%.2f\n", 
+    send_message("Temperature Control Initialized\n");
+    send_message("Target Temperature: %.2f°C\n", pid->setpoint);
+    send_message("PID Parameters: Kp=%.2f, Ki=%.2f, Kd=%.2f\n", 
            pid->Kp, pid->Ki, pid->Kd);
-    send_message("[TEMP_CTRL] Hardware PWM Mode (TIM3), Period: %dms\n", PWM_PERIOD_MS);
-    
+    send_message("Hardware PWM Mode (TIM3), Period: %dms\n", PWM_PERIOD_MS);
+
     // 打印温度区间信息
     // #if (TARGET_TEMP_INT < 50)
     // send_message("[TEMP_CTRL] Temperature Range: LOW (30-50°C)\n");
