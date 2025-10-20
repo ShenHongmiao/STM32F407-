@@ -224,17 +224,14 @@ void StartSensors_and_compute(void const * argument)
     Temp_NTC = compute_ntc_temperature(adcValue);
 
 
-    // 通过串口1发送数据
-    send_message("WF5803-Temp: %.2f C, Press: %.2f kPa\n", temperature, pressure);
-    // 通过串口1发送结果
-    send_message("NTC-Temp: %.2fC\n", Temp_NTC);
-    
-
     // ========== 后续可在此处添加其他传感器读取和计算逻辑 ==========
     PID_Compute(&temp_pid_CN1, Temp_NTC);
     Set_Heating_PWM((uint32_t)temp_pid_CN1.output);
-    // 通过串口1发送PID输出结果
-    send_message("PID Output: %.2f\n", temp_pid_CN1.output);
+    
+    // 通过串口发送传感器数据 (JSON格式，分三条发送便于串口监控)
+    send_message("{\"type\":\"data\",\"sensor\":\"WF5803\",\"temp\":%.2f,\"press\":%.2f}\n", temperature, pressure);
+    send_message("{\"type\":\"data\",\"sensor\":\"NTC\",\"temp\":%.2f}\n", Temp_NTC);
+    send_message("{\"type\":\"data\",\"sensor\":\"PID\",\"output\":%.2f}\n", temp_pid_CN1.output);
     // 延时1秒
     osDelay(500);
   }
