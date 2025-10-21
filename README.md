@@ -111,16 +111,21 @@ void StartReceiveAndTargetChangeTask(void const * argument)
 
 ### 5. 温度 PID 控制系统
 
-- **控制算法**: 增量式 PID 控制器
-- **目标温度**: 可配置（默认 50°C）
+- **控制算法**: 增量式 PID 控制器（支持积分分离）
+- **目标温度**: 可配置（默认 30°C / 35°C 双温度切换）
 - **控制输出**: TIM3 硬件 PWM（0-1000ms 占空比）
 - **控制引脚**: PC6 (TIM3_CH1), PC7 (TIM3_CH2)
 - **PWM 周期**: 1000ms（1Hz）
+- **PWM 极性**: 低电平有效（占空比 0 = 加热关闭）
 - **安全保护**
   - 紧急最高温度限制（80°C）
   - 安全关机温度（75°C）
-  - 温度死区控制（±0.5°C）
-- **PID 参数**: 根据目标温度自动选择（低温/中温/高温区域）
+  - 温度死区控制（±0.2°C）
+- **积分分离功能**
+  - 可通过宏开关启用/禁用
+  - 默认启用，阈值为 3°C
+  - 误差 > 3°C 时停止积分累积，避免积分饱和
+  - 误差 ≤ 3°C 时恢复积分作用，消除稳态误差
 
 ### 6. NMOS 控制输出
 
@@ -128,7 +133,8 @@ void StartReceiveAndTargetChangeTask(void const * argument)
 - **功能**: 4路 NMOS 驱动控制
 - **PC6/PC7**: TIM3 硬件 PWM 控制（用于加热温控，周期 1000ms）
 - **PC8/PC9**: GPIO 普通输出控制
-- **PWM 极性**: 低电平有效（LOW polarity）- 占空比 0 = 高电平 = 加热关闭
+- **PWM 极性**: 高电平有效（HIGH polarity）- 占空比 0 = 低电平 = 加热关闭
+- **当前配置**: CN1 通道 PID 控制器已初始化，通过 UART2 可接收上位机命令切换目标温度
 
 ## 引脚定义
 
@@ -755,6 +761,24 @@ osDelay(100);  // 改为 100ms (10Hz)
 #define NTC_BETA       3950.0f    // 根据实际型号修改
 ```
 
+#### 场景 5: 调整 PID 积分分离参数
+
+```c
+// temp_pid_ctrl.h
+#define ENABLE_INTEGRAL_SEPARATION     1     // 1=启用, 0=禁用
+#define INTEGRAL_SEPARATION_THRESHOLD  3.0f  // 积分分离阈值 (°C)
+```
+
+**启用积分分离（推荐）**：
+
+- 快速升温阶段（误差 > 3°C）：仅使用 P 和 D 项，避免积分饱和
+- 稳态阶段（误差 ≤ 3°C）：启用完整 PID 控制，消除稳态误差
+
+**禁用积分分离（传统 PID）**：
+
+- 设置 `ENABLE_INTEGRAL_SEPARATION` 为 0
+- 始终累积积分项，适合已调好参数的场景
+
 ### 7. TIM3 硬件 PWM 配置（温度控制）
 
 本项目已将加热 MOS 管（PC6/PC7）改为由 TIM3 定时器硬件 PWM 输出控制，周期为 1000ms，占空比可调。
@@ -770,12 +794,16 @@ osDelay(100);  // 改为 100ms (10Hz)
 
 #### 硬件极性说明
 
-⚠️ **重要**: 本项目硬件设计为**低电平驱动加热**，因此 PWM 配置为 `TIM_OCPOLARITY_LOW`：
+⚠️ **重要**: 本项目当前硬件配置为 `TIM_OCPOLARITY_HIGH`（高电平有效）：
 
-- 当 `Set_Heating_PWM(0)` 时：PWM 输出保持高电平 → MOS 管关闭 → 加热关闭（安全状态）
-- 当 `Set_Heating_PWM(1000)` 时：PWM 输出保持低电平 → MOS 管导通 → 加热全功率
+- 当 `Set_Heating_PWM(0)` 时：PWM 输出保持低电平 → MOS 管关闭 → 加热关闭（安全状态）
+- 当 `Set_Heating_PWM(1000)` 时：PWM 输出保持高电平 → MOS 管导通 → 加热全功率
 
-这样确保了系统断电或故障时，默认状态为高电平，加热器处于关闭状态，符合安全设计原则。
+**极性配置历史**：
+
+- 早期版本使用 `TIM_OCPOLARITY_LOW`（低电平有效）
+- 当前版本已修改为 `TIM_OCPOLARITY_HIGH`（高电平有效）
+- 如需更改极性，请在 `main.c` 的 `MX_TIM3_Init()` 函数中修改 `sConfigOC.OCPolarity` 参数
 
 #### 主要修改内容
 
@@ -833,6 +861,11 @@ osDelay(100);  // 改为 100ms (10Hz)
    - PC7: 选择为 TIM3_CH2（复用功能 AF2）
    - PC8/PC9: 保持为 GPIO_Output
 
+**⚠️ 极性配置说明**：
+
+- 如果硬件是**低电平驱动**（低电平时 MOS 管导通）：设置 `TIM_OCPOLARITY_LOW`
+- 如果硬件是**高电平驱动**（高电平时 MOS 管导通）：设置 `TIM_OCPOLARITY_HIGH`（当前配置）
+
 #### 兼容性说明
 
 - 该方案不再依赖软件 PWM，不受 FreeRTOS 任务调度影响，PWM 波形精确稳定。
@@ -854,8 +887,8 @@ void MX_TIM3_Init(void)
   HAL_TIM_PWM_Init(&htim3);
   
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;  // 初始占空比为 0（输出高电平，加热关闭）
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_LOW;  // ⚠️ 关键：低极性配置
+  sConfigOC.Pulse = 0;  // 初始占空比为 0（输出低电平，加热关闭）
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;  // ⚠️ 关键：高极性配置
   HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1);
   HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_2);
 }
@@ -892,4 +925,47 @@ HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 ```
 
 ---
+
+## 更新记录
+
+### 2025-10-21 (P_PWM 分支)
+
+#### 积分分离功能实现
+
+- **新增功能**：PID 控制器支持积分分离
+  - 添加宏开关 `ENABLE_INTEGRAL_SEPARATION` (1=启用, 0=禁用)
+  - 添加阈值配置 `INTEGRAL_SEPARATION_THRESHOLD` (默认 3.0°C)
+  - 误差 > 3°C 时停止积分累积，避免积分饱和
+  - 误差 ≤ 3°C 时恢复积分作用，消除稳态误差
+
+#### PID 参数调整
+
+- **Kp**: 8.0 → 130.0 (大幅提升比例增益，提高响应速度)
+- **Ki**: 0.5 → 0.2 (降低积分增益，配合积分分离使用)
+- **Kd**: 2.0 → 0.0 (禁用微分项，减少噪声影响)
+- **温度死区**: 0.5°C → 0.2°C (提高控制精度)
+- **目标温度**: 50°C → 30°C/35°C 双温度切换
+
+#### TIM3 PWM 极性修改
+
+- **极性配置**: `TIM_OCPOLARITY_LOW` → `TIM_OCPOLARITY_HIGH`
+- **原因**: 适配实际硬件电路（高电平驱动 MOS 管）
+- **影响**: 占空比 0 现在对应低电平（加热关闭），符合安全设计
+
+#### 代码优化
+
+- 添加 `temp_pid_CN1` 全局 PID 控制器实例
+- 在 `main.c` 中初始化 `TempCtrl_Init(&temp_pid_CN1)`
+- 在 `freertos.c` 传感器任务中调用 PID 计算和 PWM 输出
+- 通过 UART2 发送 JSON 格式数据（传感器数据 + PID 输出）
+- 支持上位机命令切换目标温度（按键 '1'）和调整 Kp 参数（按键 '2'）
+
+#### 新增调试功能
+
+- 添加自动切换目标温度的调试代码（可选启用）
+- 优化串口输出格式，改为 JSON 结构便于上位机解析
+- 采样周期从 1000ms 调整为 500ms，提高响应速度
+
+---
+
 如有疑问可随时联系开发者。
