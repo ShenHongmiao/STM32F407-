@@ -225,13 +225,13 @@ void StartSensors_and_compute(void const * argument)
 
 
     //调试使用，自动切换目标温度
-    if (Temp_NTC >38.0f){
-      PID_SetSetpoint(&temp_pid_CN1, TARGET_TEMP_1);
-    }
-    else if (Temp_NTC < 29.5f){
-      PID_SetSetpoint(&temp_pid_CN1, TARGET_TEMP_2);
+    // if (Temp_NTC >38.0f){
+    //   PID_SetSetpoint(&temp_pid_CN1, TARGET_TEMP_1);
+    // }
+    // else if (Temp_NTC < 29.5f){
+    //   PID_SetSetpoint(&temp_pid_CN1, TARGET_TEMP_2);
     
-    }
+    // }
 
     // ========== 后续可在此处添加其他传感器读取和计算逻辑 ==========
     PID_Compute(&temp_pid_CN1, Temp_NTC);

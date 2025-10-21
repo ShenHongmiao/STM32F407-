@@ -60,7 +60,7 @@ typedef struct {
 /* PID参数配置 - 根据不同目标温度可能需要调整 */
 /* 低温区域 (30-50°C) 推荐参数 */
 #define PID_KP             130.0f    // 比例增益
-#define PID_KI             0.0f    // 积分增益
+#define PID_KI             0.2f    // 积分增益
 #define PID_KD             0.0f    // 微分增益
 
 
