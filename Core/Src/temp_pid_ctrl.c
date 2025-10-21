@@ -85,10 +85,12 @@ void PID_Init(PID_Controller_t *pid)
 }
 
 /**
- * @brief  PID控制器计算
+ * @brief  PID控制器计算（可选积分分离）
  * @param  pid: PID控制器结构体指针
  * @param  measured_value: 当前测量的温度值
  * @retval PID输出值 (0-1000ms)
+ * @note   积分分离：当误差 > 阈值时，停止积分作用，避免积分饱和
+ *         通过 ENABLE_INTEGRAL_SEPARATION 宏控制是否启用
  */
 float PID_Compute(PID_Controller_t *pid, float measured_value)
 {
@@ -103,12 +105,24 @@ float PID_Compute(PID_Controller_t *pid, float measured_value)
         return pid->output;
     }
     
-    // 计算积分项 (转换采样时间到秒)
+    // 计算积分项
     float dt = pid->sample_time_ms / 1000.0f;
-    pid->integral += error * dt;
     
+#if ENABLE_INTEGRAL_SEPARATION
+    // 积分分离启用：只有误差绝对值 <= 阈值时才累积积分
+    if (fabsf(error) <= INTEGRAL_SEPARATION_THRESHOLD) {
+        // 误差较小，允许积分累积
+        pid->integral += error * dt;
+        // 积分限幅，防止积分饱和
+        pid->integral = Clamp(pid->integral, pid->integral_limit_min, pid->integral_limit_max);
+    }
+    // 误差过大时，保持积分值不变（不累积也不清零）
+#else
+    // 积分分离禁用：传统PID，始终累积积分
+    pid->integral += error * dt;
     // 积分限幅，防止积分饱和
     pid->integral = Clamp(pid->integral, pid->integral_limit_min, pid->integral_limit_max);
+#endif
     
     // 计算微分项
     float derivative = (error - pid->prev_error) / dt;

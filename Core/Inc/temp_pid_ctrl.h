@@ -97,6 +97,10 @@ typedef struct {
 #define TEMP_EMERGENCY_MAX      80.0f   // 紧急最高温度限制 (°C)
 #define TEMP_SAFE_SHUTDOWN      75.0f   // 安全关机温度 (°C)
 
+/* 积分分离配置 */
+#define ENABLE_INTEGRAL_SEPARATION     1     // 积分分离功能开关: 1=启用, 0=禁用
+#define INTEGRAL_SEPARATION_THRESHOLD  3.0f  // 积分分离阈值 (°C)，误差超过此值时停止积分
+
 /* Exported macro ------------------------------------------------------------*/
 
 /* Exported functions prototypes ---------------------------------------------*/
