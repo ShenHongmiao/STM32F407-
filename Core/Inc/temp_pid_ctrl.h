@@ -59,7 +59,7 @@ typedef struct {
 #define TARGET_TEMP_2     35.0f
 /* PID参数配置 - 根据不同目标温度可能需要调整 */
 /* 低温区域 (30-50°C) 推荐参数 */
-#define PID_KP             72.0f    // 比例增益
+#define PID_KP             76.0f    // 比例增益
 #define PID_KI             2.48f    // 积分增益
 #define PID_KD             0.0f    // 微分增益
 
@@ -98,7 +98,7 @@ typedef struct {
 #define TEMP_SAFE_SHUTDOWN      75.0f   // 安全关机温度 (°C)
 
 /* 积分分离配置 */
-#define ENABLE_INTEGRAL_SEPARATION     1     // 积分分离功能开关: 1=启用, 0=禁用
+#define ENABLE_INTEGRAL_SEPARATION    0    // 积分分离功能开关: 1=启用, 0=禁用
 #define INTEGRAL_SEPARATION_THRESHOLD  3.0f  // 积分分离阈值 (°C)，误差超过此值时停止积分
 
 /* Exported macro ------------------------------------------------------------*/

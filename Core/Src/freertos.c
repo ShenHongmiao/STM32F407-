@@ -226,14 +226,21 @@ void StartSensors_and_compute(void const * argument)
 
     //调试使用，自动切换目标温度
     // if (Temp_NTC >38.0f){
+    //   temp_pid_CN1.Kp = 140.0f;
+    //   temp_pid_CN1.Ki = 0.0f;
+    //   temp_pid_CN1.Kd = 0.0f;
     //   PID_SetSetpoint(&temp_pid_CN1, TARGET_TEMP_1);
     // }
     // else if (Temp_NTC < 29.5f){
+    //   temp_pid_CN1.Kp = 140.0f;
+    //   temp_pid_CN1.Ki = 0.0f;
+    //   temp_pid_CN1.Kd = 0.0f;
     //   PID_SetSetpoint(&temp_pid_CN1, TARGET_TEMP_2);
     
     // }
 
     // ========== 后续可在此处添加其他传感器读取和计算逻辑 ==========
+
     PID_Compute(&temp_pid_CN1, Temp_NTC);
     Set_Heating_PWM((uint32_t)temp_pid_CN1.output);
     
@@ -241,8 +248,8 @@ void StartSensors_and_compute(void const * argument)
     send_message("{\"type\":\"data\",\"sensor\":\"WF5803\",\"temp\":%.2f,\"press\":%.2f}\n", temperature, pressure);
     send_message("{\"type\":\"data\",\"sensor\":\"NTC\",\"temp\":%.2f}\n", Temp_NTC);
     send_message("{\"type\":\"data\",\"sensor\":\"PID\",\"output\":%.2f}\n", temp_pid_CN1.output);
-    // 延时1秒
-    osDelay(500);
+    // 延时
+    osDelay(50);
   }
 }
 
@@ -351,8 +358,7 @@ void StartReceiveAndTargetChangeTask(void const * argument)
         }
       } else if(received_byte  == '2'){
         
-          temp_pid_CN1.Kp= temp_pid_CN1.Kp + 1.0f;
-          send_message("Kp value increased to %.2f\n", temp_pid_CN1.Kp);
+         g_lowVoltageFlag = !g_lowVoltageFlag;
         }
 
       }
