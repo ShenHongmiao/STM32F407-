@@ -406,48 +406,84 @@ NTC task suspended due to low voltage!
 
 - **IDE**: Visual Studio Code + STM32 Extension
 - **编译器**: ARM GCC 10.3.1 (或更高版本)
-- **调试器**: ST-Link V2 / J-Link
+- **调试器**: ST-Link V2 / CMSIS-DAP / J-Link
 - **生成工具**: STM32CubeMX 6.x
 - **构建系统**: CMake + Ninja
+- **烧录工具**: STM32CubeProgrammer CLI / OpenOCD
+
+## VS Code 配置
+
+本项目提供完整的 VS Code 工作区配置，详见 [VSCODE_CONFIG.md](VSCODE_CONFIG.md)。
+
+### 主要配置文件
+
+| 文件 | 用途 | 移植必需 |
+|------|------|---------|
+| `launch.json` | 调试配置（ST-Link/OpenOCD） | ✅ 是 |
+| `tasks.json` | 编译和烧录任务 | ✅ 是 |
+| `settings.json` | 工作区设置 | ⚠️ 半自动 |
+| `c_cpp_properties.json` | C/C++ IntelliSense | 🔄 自动生成 |
+| `extensions.json` | 推荐扩展列表 | ⭐ 推荐 |
+
+### 快捷操作
+
+- **编译项目**: `Ctrl+Shift+B` 或点击状态栏"生成"按钮
+- **启动调试**: `F5` (OpenOCD) 或选择其他调试配置
+- **烧录程序**: `Ctrl+Shift+P` → `Tasks: Run Task` → `Build + Flash`
+- **查看调试器**: `Ctrl+Shift+P` → `Tasks: Run Task` → `CubeProg: List all available communication interfaces`
 
 ## 项目结构
 
 ```text
-I2C/
+STM32F407-/
+├── .vscode/                   # VS Code 工作区配置
+│   ├── launch.json            # 调试配置（ST-Link/OpenOCD）
+│   ├── tasks.json             # 编译和烧录任务
+│   ├── settings.json          # 工作区设置
+│   ├── c_cpp_properties.json  # C/C++ IntelliSense 配置
+│   └── extensions.json        # 推荐扩展列表
 ├── Core/
-│   ├── Inc/               # 头文件
+│   ├── Inc/                   # 头文件
 │   │   ├── main.h
 │   │   ├── i2c.h
 │   │   ├── adc.h
 │   │   ├── usart.h
 │   │   ├── gpio.h
-│   │   ├── WF5803F.h      # 气压传感器驱动
-│   │   ├── NTC.h          # NTC 温度传感器驱动
-│   │   ├── temp_pid_ctrl.h # PID 温度控制器
-│   │   ├── V_detect.h     # 电压检测
+│   │   ├── WF5803F.h          # 气压传感器驱动
+│   │   ├── NTC.h              # NTC 温度传感器驱动
+│   │   ├── temp_pid_ctrl.h    # PID 温度控制器
+│   │   ├── V_detect.h         # 电压检测
 │   │   └── FreeRTOSConfig.h
-│   └── Src/               # 源文件
+│   └── Src/                   # 源文件
 │       ├── main.c
-│       ├── freertos.c     # FreeRTOS 任务实现
+│       ├── freertos.c         # FreeRTOS 任务实现
 │       ├── i2c.c
 │       ├── adc.c
 │       ├── usart.c
 │       ├── gpio.c
 │       ├── WF5803F.c
 │       ├── NTC.c
-│       ├── temp_pid_ctrl.c # PID 温度控制实现
-│       └── V_detect.c     # 电压检测实现
+│       ├── temp_pid_ctrl.c    # PID 温度控制实现
+│       └── V_detect.c         # 电压检测实现
 ├── Drivers/
 │   ├── STM32F4xx_HAL_Driver/  # STM32 HAL 库
 │   └── CMSIS/                  # CMSIS 核心文件
 ├── Middlewares/
 │   └── Third_Party/
 │       └── FreeRTOS/          # FreeRTOS 源码
-├── build/                     # 编译输出目录
-├── CMakeLists.txt            # CMake 配置
-├── CMakePresets.json         # CMake 预设
-├── I2C.ioc                   # STM32CubeMX 项目文件
-└── README.md                 # 本文档
+├── MAC_OS_requires/           # macOS 开发环境配置指南
+├── cmake/                     # CMake 工具链配置
+│   ├── gcc-arm-none-eabi.cmake
+│   └── starm-clang.cmake
+├── build/                     # 编译输出目录（不提交到 Git）
+├── CMakeLists.txt             # CMake 配置
+├── CMakePresets.json          # CMake 预设
+├── I2C.ioc                    # STM32CubeMX 项目文件
+├── startup_stm32f407xx.s      # 启动文件
+├── STM32F407XX_FLASH.ld       # 链接脚本
+├── README.md                  # 本文档
+├── VSCODE_CONFIG.md           # VS Code 配置详解（移植指南）
+└── 上位机需求文档.md          # 上位机通信协议文档
 ```
 
 ## 详细调试相关内容

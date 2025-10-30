@@ -59,29 +59,13 @@ typedef struct {
 #define TARGET_TEMP_2     35.0f
 /* PID参数配置 - 根据不同目标温度可能需要调整 */
 /* 低温区域 (30-50°C) 推荐参数 */
-#define PID_KP             76.0f    // 比例增益
-#define PID_KI             2.48f    // 积分增益
+#define PID_KP             32.5f    // 比例增益
+#define PID_KI             1.42f    // 积分增益
 #define PID_KD             0.0f    // 微分增益
 
 
-
-// /* 根据目标温度自动选择PID参数 */
-// #if (TARGET_TEMP_INT < 50)
-//     #define PID_KP              PID_KP_LOW
-//     #define PID_KI              PID_KI_LOW
-//     #define PID_KD              PID_KD_LOW
-// #elif (TARGET_TEMP_INT < 70)
-//     #define PID_KP              PID_KP_MID
-//     #define PID_KI              PID_KI_MID
-//     #define PID_KD              PID_KD_MID
-// #else
-//     #define PID_KP              PID_KP_HIGH
-//     #define PID_KI              PID_KI_HIGH
-//     #define PID_KD              PID_KD_HIGH
-// #endif
-
 /* PID控制器配置 */
-#define PID_SAMPLE_TIME_MS      100     // PID采样周期 (ms)
+#define PID_SAMPLE_TIME_MS      100     // PID采样周期 (ms),建议与传感器读取周期一致（在freertos.c中）
 #define PID_OUTPUT_MAX          1000.0f // PID输出上限 (1000ms = 全功率)
 #define PID_OUTPUT_MIN          0.0f    // PID输出下限 (0ms = 关闭)
 #define PID_INTEGRAL_MAX        500.0f  // 积分限幅最大值
@@ -98,8 +82,8 @@ typedef struct {
 #define TEMP_SAFE_SHUTDOWN      75.0f   // 安全关机温度 (°C)
 
 /* 积分分离配置 */
-#define ENABLE_INTEGRAL_SEPARATION    0    // 积分分离功能开关: 1=启用, 0=禁用
-#define INTEGRAL_SEPARATION_THRESHOLD  3.0f  // 积分分离阈值 (°C)，误差超过此值时停止积分
+#define ENABLE_INTEGRAL_SEPARATION    1    // 积分分离功能开关: 1=启用, 0=禁用
+#define INTEGRAL_SEPARATION_THRESHOLD  2.0f  // 积分分离阈值 (°C)，误差超过此值时停止积分
 
 /* Exported macro ------------------------------------------------------------*/
 

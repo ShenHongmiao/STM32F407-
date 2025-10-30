@@ -225,13 +225,13 @@ void StartSensors_and_compute(void const * argument)
 
 
     //调试使用，自动切换目标温度
-    // if (Temp_NTC >38.0f){
-    //   temp_pid_CN1.Kp = 140.0f;
+    // if (Temp_NTC >30.0f){
+    //   temp_pid_CN1.Kp = 0.0f;
     //   temp_pid_CN1.Ki = 0.0f;
     //   temp_pid_CN1.Kd = 0.0f;
     //   PID_SetSetpoint(&temp_pid_CN1, TARGET_TEMP_1);
     // }
-    // else if (Temp_NTC < 29.5f){
+    // else if (Temp_NTC < 26.5f){
     //   temp_pid_CN1.Kp = 140.0f;
     //   temp_pid_CN1.Ki = 0.0f;
     //   temp_pid_CN1.Kd = 0.0f;
@@ -249,7 +249,7 @@ void StartSensors_and_compute(void const * argument)
     send_message("{\"type\":\"data\",\"sensor\":\"NTC\",\"temp\":%.2f}\n", Temp_NTC);
     send_message("{\"type\":\"data\",\"sensor\":\"PID\",\"output\":%.2f}\n", temp_pid_CN1.output);
     // 延时
-    osDelay(50);
+    osDelay(PID_SAMPLE_TIME_MS);
   }
 }
 
@@ -358,7 +358,8 @@ void StartReceiveAndTargetChangeTask(void const * argument)
         }
       } else if(received_byte  == '2'){
         
-         g_lowVoltageFlag = !g_lowVoltageFlag;
+          PID_SetSetpoint(&temp_pid_CN1, 40.0f);
+          send_message("Target temperature set to %.2f°C\n", 40.0f);
         }
 
       }
