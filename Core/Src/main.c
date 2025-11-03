@@ -114,14 +114,21 @@ int main(void)
   MX_TIM3_Init(); // 初始化TIM3为PWM输出
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);       // 启动CH1 PWM
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);       // 启动CH2 PWM
-  HAL_UART_Receive_IT(&huart2, &rx_byte, 1); // 启动USART2的中断接收，接收单个字节
-
-  Detect_Power(); // 检测电源电压，必要时发送警告
-  TempCtrl_Init(&temp_pid_CN1); // 初始化温度控制系统，传入CN1通道PID控制器结构体指针
+  //HAL_UART_Receive_IT(&huart2, &rx_byte, 1); // 启动USART2的中断接收，接收单个字节
+  HAL_Delay(100);  // 给无线模块 100ms 启动时间
   /* USER CODE END 2 */
 
   /* Call init function for freertos objects (in cmsis_os2.c) */
   MX_FREERTOS_Init();
+
+  /* USER CODE BEGIN RTOS_THREADS */
+  
+  // 延迟等待无线模块启动（PD3/PD4 控制引脚设置后需要时间）
+  // 无线模块需要初始化射频电路、建立连接等，通常需要 50-200ms
+  //发送间隔消息，用来分隔启动信息和之前的信息（换行和间隔）
+  
+  Detect_Power(); // 检测电源电压，必要时发送警告
+  TempCtrl_Init(&temp_pid_CN1); // 初始化温度控制系统，传入CN1通道PID控制器结构体指针
 
   /* Start scheduler */
   osKernelStart();

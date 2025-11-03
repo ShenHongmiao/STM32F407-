@@ -162,6 +162,7 @@ void StartDefaultTask(void const * argument)
 {
   // /* USER CODE BEGIN StartDefaultTask */
   osDelay(10000);
+  HAL_UART_Receive_IT(&huart2, &rx_byte, 1); // 启动USART2的中断接收，接收单个字节
   // 删除自己，释放资源
   vTaskDelete(NULL);
 
@@ -190,7 +191,7 @@ void StartSensors_and_compute(void const * argument)
   HAL_StatusTypeDef status;
 
   send_message("=== Sensors_and_compute Task Started! ===\n");
-  
+  osDelay(10);
   /* Infinite loop */
   for(;;)
   {
@@ -212,7 +213,7 @@ void StartSensors_and_compute(void const * argument)
     }
     
     // 获取温度和气压数据
-    WF5803F_GetData(&temperature, &pressure);
+    //WF5803F_GetData(&temperature, &pressure);
     
     
     
@@ -245,7 +246,7 @@ void StartSensors_and_compute(void const * argument)
     Set_Heating_PWM((uint32_t)temp_pid_CN1.output);
     
     // 通过串口发送传感器数据 (JSON格式，分三条发送便于串口监控)
-    send_message("{\"type\":\"data\",\"sensor\":\"WF5803\",\"temp\":%.2f,\"press\":%.2f}\n", temperature, pressure);
+    //send_message("{\"type\":\"data\",\"sensor\":\"WF5803\",\"temp\":%.2f,\"press\":%.2f}\n", temperature, pressure);
     send_message("{\"type\":\"data\",\"sensor\":\"NTC\",\"temp\":%.2f}\n", Temp_NTC);
     send_message("{\"type\":\"data\",\"sensor\":\"PID\",\"output\":%.2f}\n", temp_pid_CN1.output);
     // 延时
@@ -271,7 +272,7 @@ void StartVoltageMonitorTask(void const * argument)
   send_message("=== Voltage Monitor Task Started (Priority: Low) ===\n");
   send_message("Check interval: %d ms (%.1f minutes)\n", VOLTAGE_CHECK_INTERVAL, VOLTAGE_CHECK_INTERVAL/60000.0f);
   send_message("========================================\n\n\n");
-  
+  osDelay(10);
   // ========== 进入周期检测循环 ==========
   for(;;)
   {
@@ -333,7 +334,6 @@ void StartReceiveAndTargetChangeTask(void const * argument)
   uint8_t received_byte;
   
   send_message("=== USART Receive Task Started (Priority: Realtime) ===\n");
- 
   /* Infinite loop */
   for(;;)
   {

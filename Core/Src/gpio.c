@@ -52,6 +52,8 @@ void MX_GPIO_Init(void)
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
+  // 初始化PD3和PD4为低电平
+  HAL_GPIO_WritePin(GPIOD, PD3_OUT_Pin|PD4_OUT_Pin, GPIO_PIN_RESET);
 
     // 配置PC6/PC7为定时器复用功能（TIM3_CH1/CH2）
     GPIO_InitStruct.Pin = NMOS1_G_Pin|NMOS2_G_Pin;
@@ -67,6 +69,19 @@ void MX_GPIO_Init(void)
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
     HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PD3_OUT_Pin PD4_OUT_Pin (GPIO输出) */
+  GPIO_InitStruct.Pin = PD3_OUT_Pin|PD4_OUT_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;      // 推挽输出
+  GPIO_InitStruct.Pull = GPIO_NOPULL;              // 无上下拉
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;     // 低速
+  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PD7_IN_Pin (GPIO输入) */
+  GPIO_InitStruct.Pin = PD7_IN_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;          // 输入模式
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;            // 下拉（可根据需要改为GPIO_PULLUP或GPIO_NOPULL）
+  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
 }
 

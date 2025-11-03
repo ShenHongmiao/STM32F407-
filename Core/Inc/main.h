@@ -68,6 +68,12 @@ extern TIM_HandleTypeDef htim3;  // TIM3句柄（PWM控制）
 #define NMOS3_G_GPIO_Port GPIOC
 #define NMOS4_G_Pin GPIO_PIN_9
 #define NMOS4_G_GPIO_Port GPIOC
+#define PD3_OUT_Pin GPIO_PIN_3
+#define PD3_OUT_GPIO_Port GPIOD
+#define PD4_OUT_Pin GPIO_PIN_4
+#define PD4_OUT_GPIO_Port GPIOD
+#define PD7_IN_Pin GPIO_PIN_7
+#define PD7_IN_GPIO_Port GPIOD
 
 /* USER CODE BEGIN Private defines */
 

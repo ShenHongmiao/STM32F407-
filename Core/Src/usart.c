@@ -79,7 +79,9 @@ void MX_USART2_UART_Init(void)
   /* USER CODE END USART2_Init 0 */
 
   /* USER CODE BEGIN USART2_Init 1 */
-
+    //设置PD3 PD4的输出电平（初始化）（分开设置）
+  HAL_GPIO_WritePin(GPIOD, PD3_OUT_Pin, GPIO_PIN_RESET);// PD3 输出电平，高电平应该是 HAL_GPIO_WritePin(GPIOD, PD3_OUT_Pin, GPIO_PIN_SET),低电平应该是 HAL_GPIO_WritePin(GPIOD, PD3_OUT_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOD, PD4_OUT_Pin, GPIO_PIN_RESET);// PD4 输出电平，高电平应该是 HAL_GPIO_WritePin(GPIOD, PD4_OUT_Pin, GPIO_PIN_SET),低电平应该是 HAL_GPIO_WritePin(GPIOD, PD4_OUT_Pin, GPIO_PIN_RESET);
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
   huart2.Init.BaudRate = 115200;
