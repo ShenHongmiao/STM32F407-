@@ -19,6 +19,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "usart.h"
+#include <stdio.h>
 
 /* USER CODE BEGIN 0 */
 
@@ -31,9 +32,22 @@
 
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
+DMA_HandleTypeDef hdma_usart2_tx;
 
 /* USER CODE BEGIN 1 */
 
+// ============ 双缓冲区 DMA 发送系统 ============
+// 双缓冲区定义
+static char buffer_a[UART_TX_BUFFER_SIZE];
+static char buffer_b[UART_TX_BUFFER_SIZE];
+
+// 状态变量
+static volatile uint8_t is_tx_busy = 0;           // DMA 是否忙碌 (0=空闲, 1=忙碌)
+static volatile uint16_t idle_buf_len = 0;        // 空闲缓冲区中待发送的数据长度
+static volatile uint8_t active_buf_index = 0;     // 当前 DMA 正在发送的缓冲区 (0=A, 1=B)
+
+// 互斥锁句柄（保护缓冲区切换和状态变量）
+static osMutexId uart_tx_mutex = NULL;
 
 //static uint8_t rx_buffer[UART_RX_BUFFER_SIZE]; // 用于累积数据的缓冲区
 uint8_t rx_byte;               // 用于单字节接收
@@ -152,7 +166,25 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
     GPIO_InitStruct.Alternate = GPIO_AF7_USART2;
     HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
-    
+
+    /* USART2 DMA Init */
+    /* USART2_TX Init */
+    hdma_usart2_tx.Instance = DMA1_Stream6;
+    hdma_usart2_tx.Init.Channel = DMA_CHANNEL_4;
+    hdma_usart2_tx.Init.Direction = DMA_MEMORY_TO_PERIPH;
+    hdma_usart2_tx.Init.PeriphInc = DMA_PINC_DISABLE;
+    hdma_usart2_tx.Init.MemInc = DMA_MINC_ENABLE;
+    hdma_usart2_tx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+    hdma_usart2_tx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
+    hdma_usart2_tx.Init.Mode = DMA_NORMAL;
+    hdma_usart2_tx.Init.Priority = DMA_PRIORITY_LOW;
+    hdma_usart2_tx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
+    if (HAL_DMA_Init(&hdma_usart2_tx) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
+    __HAL_LINKDMA(uartHandle,hdmatx,hdma_usart2_tx);
 
   /* USER CODE BEGIN USART2_MspInit 1 */
     /* USART2 中断配置 */
@@ -201,6 +233,8 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
     */
     HAL_GPIO_DeInit(GPIOD, GPIO_PIN_5|GPIO_PIN_6);
 
+    /* USART2 DMA DeInit */
+    HAL_DMA_DeInit(uartHandle->hdmatx);
   /* USER CODE BEGIN USART2_MspDeInit 1 */
 
   /* USER CODE END USART2_MspDeInit 1 */
@@ -210,7 +244,7 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
 /* USER CODE BEGIN 1 */
 
 /**
- * @brief  串口2发送格式化字符串（类似printf）
+ * @brief  串口2发送格式化字符串（双缓冲区非阻塞DMA发送）
  * @param  format: 格式化字符串
  * @param  ...: 可变参数
  * @retval None
@@ -220,30 +254,147 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
  *         send_message("Temperature: %.2f°C\n", temp);
  *         send_message("ADC: %d, Voltage: %.2fV\n", adc_value, voltage);
  * 
- * @note   此函数线程安全，可在FreeRTOS多任务环境中使用
+ * @note   RTOS启动前：使用阻塞发送
+ * @note   RTOS启动后：使用双缓冲区DMA，完全非阻塞，数据覆盖策略
+ * @note   数据新鲜度 > 完整性，高频发送时自动丢弃旧数据
  */
 void send_message(const char *format, ...)
 {
-    char buffer[UART_TX_BUFFER_SIZE];
     va_list args;
+    int len;
     
     // 开始可变参数处理
     va_start(args, format);
     
-    // 格式化字符串到缓冲区
-    int len = vsnprintf(buffer, UART_TX_BUFFER_SIZE, format, args);
-    
-    // 结束可变参数处理
-    va_end(args);
-    
-    // 确保不超过缓冲区大小
-    if (len > 0 && len < UART_TX_BUFFER_SIZE) {
-        // 通过串口2发送数据
-        HAL_UART_Transmit(&huart2, (uint8_t*)buffer, len, HAL_MAX_DELAY);
+    // 检查 RTOS 是否已启动
+    if (osKernelRunning()) {
+        // ========== RTOS 已启动：双缓冲区非阻塞 DMA 发送 ==========
+        
+        // 创建互斥锁（首次调用时）
+        if (uart_tx_mutex == NULL) {
+            osMutexDef(uart_tx_mutex);
+            uart_tx_mutex = osMutexCreate(osMutex(uart_tx_mutex));
+        }
+        
+        // 尝试获取互斥锁（超时为0，立即返回）
+        if (osMutexWait(uart_tx_mutex, 0) != osOK) {
+            va_end(args);
+            return;  // 获取失败，舍弃本次发送
+        }
+        
+        // 确定空闲缓冲区（与 active_buf_index 相反的那个）
+        char *idle_buffer = (active_buf_index == 0) ? buffer_b : buffer_a;
+        
+        // 格式化数据到空闲缓冲区（无条件覆盖）
+        len = vsnprintf(idle_buffer, UART_TX_BUFFER_SIZE, format, args);
+        va_end(args);
+        
+        // 验证长度
+        if (len <= 0 || len >= UART_TX_BUFFER_SIZE) {
+            osMutexRelease(uart_tx_mutex);
+            return;
+        }
+        
+        // 更新空闲缓冲区长度
+        idle_buf_len = len;
+        
+        // 检查 DMA 是否空闲
+        if (is_tx_busy == 0) {
+            // DMA 空闲，立即启动发送
+            
+            // 切换缓冲区（空闲区变为活动区）
+            active_buf_index = (active_buf_index == 0) ? 1 : 0;
+            char *active_buffer = (active_buf_index == 0) ? buffer_a : buffer_b;
+            
+            // 清空空闲区长度
+            uint16_t send_len = idle_buf_len;
+            idle_buf_len = 0;
+            
+            // 设置忙碌标志
+            is_tx_busy = 1;
+            
+            // 启动 DMA 发送
+            if (HAL_UART_Transmit_DMA(&huart2, (uint8_t*)active_buffer, send_len) != HAL_OK) {
+                // 启动失败，清除忙碌标志
+                is_tx_busy = 0;
+            }
+        }
+        // 否则 DMA 正忙，数据已写入空闲区，等待回调函数发送
+        
+        // 释放互斥锁
+        osMutexRelease(uart_tx_mutex);
+        
+    } else {
+        // ========== RTOS 未启动：阻塞发送 ==========
+        char temp_buffer[UART_TX_BUFFER_SIZE];
+        
+        len = vsnprintf(temp_buffer, UART_TX_BUFFER_SIZE, format, args);
+        va_end(args);
+        
+        if (len > 0 && len < UART_TX_BUFFER_SIZE) {
+            HAL_UART_Transmit(&huart2, (uint8_t*)temp_buffer, len, 1000);
+        }
     }
 }
 
 
+/**
+ * @brief  UART DMA 发送完成回调函数（流水线切换）
+ * @param  huart: UART 句柄
+ * @retval None
+ * @note   在 DMA 中断中调用，负责检查并启动下一帧发送
+ */
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+    if (huart->Instance == USART2) {
+        // 清除忙碌标志
+        is_tx_busy = 0;
+        
+        // 检查空闲缓冲区是否有待发送数据
+        if (idle_buf_len > 0) {
+            // 有新数据，切换缓冲区并启动发送
+            
+            // 切换缓冲区（空闲区变为活动区）
+            active_buf_index = (active_buf_index == 0) ? 1 : 0;
+            char *active_buffer = (active_buf_index == 0) ? buffer_a : buffer_b;
+            
+            // 获取待发送长度并清零
+            uint16_t send_len = idle_buf_len;
+            idle_buf_len = 0;
+            
+            // 设置忙碌标志
+            is_tx_busy = 1;
+            
+            // 启动 DMA 发送
+            if (HAL_UART_Transmit_DMA(&huart2, (uint8_t*)active_buffer, send_len) != HAL_OK) {
+                // 启动失败，清除忙碌标志
+                is_tx_busy = 0;
+            }
+        }
+        // 否则无新数据，DMA 保持空闲状态，等待下次 send_message 调用
+    }
+}
+
+/**
+ * @brief  UART 错误回调函数
+ * @param  huart: UART 句柄
+ * @retval None
+ * @note   当 DMA 传输出错时调用
+ */
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+    if (huart->Instance == USART2) {
+        // DMA 传输错误处理
+        // 可以在这里记录错误、重启传输等
+        // 目前简单地忽略错误，让系统继续运行
+    }
+}
+
+/**
+ * @brief  UART 接收完成中断回调函数
+ * @param  huart: UART 句柄
+ * @retval None
+ */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
     if (huart->Instance == USART2) {

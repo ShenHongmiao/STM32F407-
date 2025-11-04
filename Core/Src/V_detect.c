@@ -1,4 +1,5 @@
 #include "V_detect.h"
+#include "usart.h"
 
 /**
  * @brief  读取 ADC1 通道14 (PC4) 的电压
@@ -79,7 +80,8 @@ void Send_VoltageWarning(float voltage, const char* message)
     }
 
     // 通过 UART2 发送给上位机
-    HAL_UART_Transmit(&huart2, (uint8_t*)uartMsg, strlen(uartMsg), 1000);
+    send_message(uartMsg);
+    //HAL_UART_Transmit(&huart2, (uint8_t*)uartMsg, strlen(uartMsg), 1000);
 }
 
 /**

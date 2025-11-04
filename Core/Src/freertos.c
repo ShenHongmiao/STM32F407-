@@ -184,8 +184,8 @@ void StartDefaultTask(void const * argument)
   */
 void StartSensors_and_compute(void const * argument)
 {
-  float temperature;
-  float pressure;
+  //float temperature;
+  //float pressure;
   float Temp_NTC;
   uint32_t adcValue;
   HAL_StatusTypeDef status;

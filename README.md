@@ -18,11 +18,83 @@
 - **通信接口**: UART2 (PD5/PD6)
 - **波特率**: 115200
 - **接收方式**: 中断 + FreeRTOS 队列（队列大小 16 字节）
+- **发送方式**: 🆕 **双缓冲区 DMA 非阻塞发送**（2025-11-04 更新）
 - **任务优先级**: Realtime（最高优先级，确保实时响应）
 - **工作模式**: 阻塞等待接收，死等上位机命令
 - **数据输出**: 传感器数据和系统状态通过 UART2 发送到上位机
 
-**实现细节**:
+#### 📡 DMA 发送系统（最新实现）
+
+**核心特性**:
+
+- ✅ **完全非阻塞** - `send_message()` 永不等待，即使 DMA 忙碌也立即返回
+- ✅ **数据新鲜度优先** - 高频发送时自动覆盖旧数据，确保发送最新状态
+- ✅ **流水线发送** - DMA 完成回调自动切换缓冲区并启动下一帧
+- ✅ **线程安全** - 互斥锁保护，超时 0ms，避免任何阻塞
+
+**双缓冲区架构**:
+
+```c
+// 双缓冲区定义
+buffer_a[256], buffer_b[256]        // 两个发送缓冲区
+is_tx_busy                           // DMA 忙碌标志
+idle_buf_len                         // 空闲缓冲区待发数据长度
+active_buf_index                     // 当前 DMA 使用的缓冲区 (0=A, 1=B)
+uart_tx_mutex                        // 互斥锁
+```
+
+**工作流程**:
+
+1. `send_message()` 被调用
+2. 尝试获取互斥锁 (超时 0ms)
+3. 写入空闲缓冲区 (idle_buffer)
+4. 更新 `idle_buf_len`
+5. 若 DMA 空闲 (`is_tx_busy==0`):
+   - 切换缓冲区 (空闲→活动)
+   - 启动 DMA 发送
+   - 设置 `is_tx_busy=1`
+6. 若 DMA 忙碌:
+   - 直接返回，等待回调处理
+7. DMA 完成回调 (`HAL_UART_TxCpltCallback`):
+   - 清除 `is_tx_busy`
+   - 检查 `idle_buf_len > 0`
+   - 若有新数据，切换缓冲区并自动发送下一帧
+
+**使用示例**:
+
+```c
+// 多任务并发调用，无阻塞，数据自动覆盖
+send_message("{\"temp\":%.2f}\n", temp);
+send_message("{\"pressure\":%.2f}\n", pressure);
+```
+
+**DMA 配置**:
+
+```c
+// dma.c - DMA1 Stream6 初始化
+__HAL_RCC_DMA1_CLK_ENABLE();
+HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 6, 0);
+HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
+
+// usart.c - USART2 DMA 链接
+hdma_usart2_tx.Instance = DMA1_Stream6;
+hdma_usart2_tx.Init.Channel = DMA_CHANNEL_4;
+hdma_usart2_tx.Init.Direction = DMA_MEMORY_TO_PERIPH;
+hdma_usart2_tx.Init.Mode = DMA_NORMAL;  // 非循环模式
+__HAL_LINKDMA(uartHandle, hdmatx, hdma_usart2_tx);
+```
+
+**相关文件**:
+
+- `Core/Inc/dma.h` - DMA 外设头文件
+- `Core/Src/dma.c` - DMA 初始化代码
+- `Core/Inc/usart.h` - USART + DMA 声明
+- `Core/Src/usart.c` - 双缓冲区发送实现
+- `Core/Src/stm32f4xx_it.c` - DMA 中断处理
+
+---
+
+#### 📋 UART 接收实现细节（保持不变）
 
 - USART2 中断接收每个字节后，通过 `osMessagePut()` 放入队列
 - `receiveAndTargetChange` 任务使用 `osMessageGet(osWaitForever)` 阻塞读取
@@ -32,9 +104,13 @@
 **中断优先级配置**:
 
 ```c
-// usart.c - USART2 中断配置
+// usart.c - USART2 接收中断配置
 HAL_NVIC_SetPriority(USART2_IRQn, 6, 0);  // 优先级 6 (≥ 5)
 HAL_NVIC_EnableIRQ(USART2_IRQn);
+
+// dma.c - DMA1 Stream6 发送中断配置（新增）
+HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 6, 0);
+HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
 ```
 
 **队列创建**:
@@ -48,10 +124,16 @@ usart_rx_queueHandle = osMessageCreate(osMessageQ(usart_rx_queue), NULL);
 **中断处理函数**:
 
 ```c
-// stm32f4xx_it.c - USART2 中断服务函数
+// stm32f4xx_it.c - USART2 接收中断服务函数
 void USART2_IRQHandler(void)
 {
   HAL_UART_IRQHandler(&huart2);
+}
+
+// stm32f4xx_it.c - DMA1 Stream6 发送中断服务函数（新增）
+void DMA1_Stream6_IRQHandler(void)
+{
+  HAL_DMA_IRQHandler(&hdma_usart2_tx);
 }
 ```
 
@@ -64,6 +146,29 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
   if (huart->Instance == USART2) {
     osMessagePut(usart_rx_queueHandle, (uint32_t)rx_byte, 0);
     HAL_UART_Receive_IT(&huart2, &rx_byte, 1);
+  }
+}
+```
+
+**发送完成回调（新增）**:
+
+```c
+// usart.c - DMA 发送完成回调（流水线自动切换）
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+  if (huart->Instance == USART2) {
+    is_tx_busy = 0;  // 清除忙碌标志
+    
+    // 检查空闲缓冲区是否有待发送数据
+    if (idle_buf_len > 0) {
+      // 切换缓冲区并自动启动下一帧发送
+      active_buf_index = !active_buf_index;
+      char *active_buffer = (active_buf_index == 0) ? buffer_a : buffer_b;
+      uint16_t send_len = idle_buf_len;
+      idle_buf_len = 0;
+      is_tx_busy = 1;
+      HAL_UART_Transmit_DMA(&huart2, (uint8_t*)active_buffer, send_len);
+    }
   }
 }
 ```
@@ -445,6 +550,7 @@ STM32F407-/
 ├── Core/
 │   ├── Inc/                   # 头文件
 │   │   ├── main.h
+│   │   ├── dma.h              # 🆕 DMA 外设头文件
 │   │   ├── i2c.h
 │   │   ├── adc.h
 │   │   ├── usart.h
@@ -456,15 +562,17 @@ STM32F407-/
 │   │   └── FreeRTOSConfig.h
 │   └── Src/                   # 源文件
 │       ├── main.c
+│       ├── dma.c              # 🆕 DMA 初始化代码
 │       ├── freertos.c         # FreeRTOS 任务实现
 │       ├── i2c.c
 │       ├── adc.c
-│       ├── usart.c
+│       ├── usart.c            # 🔄 含双缓冲区 DMA 发送
 │       ├── gpio.c
 │       ├── WF5803F.c
 │       ├── NTC.c
 │       ├── temp_pid_ctrl.c    # PID 温度控制实现
-│       └── V_detect.c         # 电压检测实现
+│       ├── V_detect.c         # 电压检测实现
+│       └── stm32f4xx_it.c     # 🔄 含 DMA 中断处理
 ├── Drivers/
 │   ├── STM32F4xx_HAL_Driver/  # STM32 HAL 库
 │   └── CMSIS/                  # CMSIS 核心文件
@@ -963,6 +1071,54 @@ HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 ---
 
 ## 更新记录
+
+### 2025-11-04 (双缓冲区 DMA 发送系统)
+
+#### 🚀 UART2 DMA 发送全面重构
+
+- **新增功能**: 双缓冲区非阻塞 DMA 发送系统
+  - 添加 `Core/Inc/dma.h` 和 `Core/Src/dma.c` (按 STM32CubeMX 标准)
+  - DMA1 Stream6 Channel 4 用于 USART2_TX
+  - 中断优先级设置为 6 (兼容 FreeRTOS)
+  
+- **发送策略**: 数据新鲜度优先于完整性
+  - `send_message()` 完全非阻塞，0ms 超时
+  - 高频调用时自动覆盖旧数据（舍弃策略）
+  - 流水线发送：回调函数自动切换缓冲区
+  
+- **双缓冲区架构**:
+  - `buffer_a[256]` / `buffer_b[256]` - 两个发送缓冲区
+  - `is_tx_busy` - DMA 忙碌标志
+  - `idle_buf_len` - 空闲缓冲区数据长度
+  - `active_buf_index` - 当前活动缓冲区索引
+  - `uart_tx_mutex` - 互斥锁（0ms 超时）
+  
+- **构建系统更新**:
+  - `cmake/stm32cubemx/CMakeLists.txt` 添加 `dma.c`
+  - `Core/Src/main.c` 添加 `MX_DMA_Init()` 初始化
+  - `Core/Src/stm32f4xx_it.c` 添加 `DMA1_Stream6_IRQHandler()`
+
+#### ⚠️ 弃用说明
+
+- **已弃用**: 单缓冲区阻塞/半阻塞 DMA 发送方案
+  - 旧版本使用 `uart_dma_tx_complete` 标志等待
+  - 多任务并发时存在数据粘连问题
+  - 使用互斥锁仍然有阻塞风险
+  - 不适合高频率实时数据发送场景
+
+- **迁移建议**:
+  - 所有调用 `send_message()` 的地方无需修改
+  - 函数接口保持不变，内部实现已更新
+  - 自动兼容 RTOS 启动前的阻塞发送
+
+#### 预期改进
+
+- ✅ 多任务并发调用 `send_message()` 无阻塞
+- ✅ JSON 消息不再粘连
+- ✅ 实时传感器数据发送更流畅
+- ✅ 适合高频数据上报场景（传感器监控、日志输出等）
+
+---
 
 ### 2025-10-21 (P_PWM 分支)
 
