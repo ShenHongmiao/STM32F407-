@@ -119,7 +119,7 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* definition and creation of usart_rx_queue */
-  osMessageQDef(usart_rx_queue, 16, uint32_t);
+  osMessageQDef(usart_rx_queue, 64, uint32_t);  // 增大队列: 16 → 64 字节
   usart_rx_queueHandle = osMessageCreate(osMessageQ(usart_rx_queue), NULL);
   /* USER CODE END RTOS_QUEUES */
 
