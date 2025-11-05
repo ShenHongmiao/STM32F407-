@@ -62,6 +62,19 @@ void MX_USART2_UART_Init(void);
  */
 void send_message(const char *format, ...);
 
+/**
+ * @brief  获取消息发送时间统计
+ * @param  time_since_first: 距离第一条消息的时间（ms）输出
+ * @param  last_interval: 上一次消息间隔（ms）输出
+ * @retval None
+ */
+void get_tx_timing(uint32_t *time_since_first, uint32_t *last_interval);
+
+/**
+ * @brief  重置时间统计
+ * @retval None
+ */
+void reset_tx_timing(void);
 
 void receive_message(char *buffer, size_t buffer_size);
 /* USER CODE END Prototypes */

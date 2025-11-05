@@ -245,10 +245,15 @@ void StartSensors_and_compute(void const * argument)
     PID_Compute(&temp_pid_CN1, Temp_NTC);
     Set_Heating_PWM((uint32_t)temp_pid_CN1.output);
     
-    // 通过串口发送传感器数据 (JSON格式，分三条发送便于串口监控)
+    // 获取时间统计
+    uint32_t time_since_first, last_interval;
+    get_tx_timing(&time_since_first, &last_interval);
+    
+    // 通过串口发送传感器数据 (JSON格式，附带时间统计)
     //send_message("{\"type\":\"data\",\"sensor\":\"WF5803\",\"temp\":%.2f,\"press\":%.2f}\n", temperature, pressure);
-    send_message("{\"type\":\"data\",\"sensor\":\"NTC\",\"temp\":%.2f}\n", Temp_NTC);
-    send_message("{\"type\":\"data\",\"sensor\":\"PID\",\"output\":%.2f}\n", temp_pid_CN1.output);
+    send_message("{\"NTC\":%.2f,\"PID\":%.2f,\"t\":%lu,\"dt\":%lu}\n", 
+                 Temp_NTC, temp_pid_CN1.output, time_since_first, last_interval);
+    
     // 延时
     osDelay(PID_SAMPLE_TIME_MS);
   }

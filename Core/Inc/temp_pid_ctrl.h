@@ -65,7 +65,7 @@ typedef struct {
 
 
 /* PID控制器配置 */
-#define PID_SAMPLE_TIME_MS      100     // PID采样周期 (ms),建议与传感器读取周期一致（在freertos.c中）
+#define PID_SAMPLE_TIME_MS      5     // PID采样周期 (ms),建议与传感器读取周期一致（在freertos.c中）
 #define PID_OUTPUT_MAX          1000.0f // PID输出上限 (1000ms = 全功率)
 #define PID_OUTPUT_MIN          0.0f    // PID输出下限 (0ms = 关闭)
 #define PID_INTEGRAL_MAX        500.0f  // 积分限幅最大值

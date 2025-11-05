@@ -49,6 +49,11 @@ static volatile uint8_t active_buf_index = 0;     // 当前 DMA 正在发送的�
 // 互斥锁句柄（保护缓冲区切换和状态变量）
 static osMutexId uart_tx_mutex = NULL;
 
+// ============ 时间间隔统计 ============
+static volatile uint32_t first_tx_timestamp = 0;   // 第一条消息的时间戳（ms）
+static volatile uint32_t last_tx_timestamp = 0;    // 上一条消息的时间戳（ms）
+static volatile uint32_t last_tx_interval = 0;    // 上一次消息间隔（ms）
+
 //static uint8_t rx_buffer[UART_RX_BUFFER_SIZE]; // 用于累积数据的缓冲区
 uint8_t rx_byte;               // 用于单字节接收
 
@@ -317,6 +322,20 @@ void send_message(const char *format, ...)
             if (HAL_UART_Transmit_DMA(&huart2, (uint8_t*)active_buffer, send_len) != HAL_OK) {
                 // 启动失败，清除忙碌标志
                 is_tx_busy = 0;
+            } else {
+                // ========== 记录时间戳和计算间隔 ==========
+                uint32_t current_time = HAL_GetTick();
+                
+                // 记录第一条消息的时间戳
+                if (first_tx_timestamp == 0) {
+                    first_tx_timestamp = current_time;
+                    last_tx_timestamp = current_time;
+                    last_tx_interval = 0;
+                } else {
+                    // 计算与上一条消息的时间间隔
+                    last_tx_interval = current_time - last_tx_timestamp;
+                    last_tx_timestamp = current_time;
+                }
             }
         }
         // 否则 DMA 正忙，数据已写入空闲区，等待回调函数发送
@@ -407,5 +426,39 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
         // 重新启动接收
         HAL_UART_Receive_IT(&huart2, &rx_byte, 1);
     }
+}
+
+/**
+ * @brief  获取消息发送时间统计
+ * @param  time_since_first: 距离第一条消息的时间（ms）输出
+ * @param  last_interval: 上一次消息间隔（ms）输出
+ * @retval None
+ */
+void get_tx_timing(uint32_t *time_since_first, uint32_t *last_interval)
+{
+    uint32_t current_time = HAL_GetTick();
+    
+    if (time_since_first) {
+        if (first_tx_timestamp == 0) {
+            *time_since_first = 0;
+        } else {
+            *time_since_first = current_time - first_tx_timestamp;
+        }
+    }
+    
+    if (last_interval) {
+        *last_interval = last_tx_interval;
+    }
+}
+
+/**
+ * @brief  重置时间统计
+ * @retval None
+ */
+void reset_tx_timing(void)
+{
+    first_tx_timestamp = 0;
+    last_tx_timestamp = 0;
+    last_tx_interval = 0;
 }
 /* USER CODE END 1 */
